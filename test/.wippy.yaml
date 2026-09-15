@@ -9,7 +9,7 @@ workspace:
     # The shell and the base are resolved from their GitHub repositories by
     # tag (wippy.lock). To test against a working copy of the shell, add a
     # replacement here and remove it again before committing:
-    #   chicago/shell: ../../windows-module
+    #   chicago/shell: ../../shell
     # The platform is stood in, not booted: each stand-in carries only the
     # libraries aICQ imports (test/stubs/*, README "Development"). Their lock
     # entries keep the real versions, without a hash, so the module's lower

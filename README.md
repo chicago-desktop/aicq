@@ -96,7 +96,7 @@ make icons   # redraw assets/images/{32,16}/*.png
 `v0.3.40a-chicago.2` or newer): it resolves the shell and the base from
 GitHub by tag, and the shell declares entries with the `gfx` module, which
 the release runtime does not have. The Makefile uses
-`~/repos/wippy/runtime/dist/wippy-linux-amd64`; override it with `WIPPY=…`.
+`../runtime/dist/wippy-linux-amd64` (the fork checked out beside this directory); override it with `WIPPY=…`.
 
 `chicago/shell` and `chicago/tui-desktop` are resolved from their GitHub
 repositories by tag (`component: github.com/chicago-desktop/shell`,
