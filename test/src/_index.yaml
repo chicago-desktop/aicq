@@ -4,10 +4,10 @@ namespace: app
 # Standalone harness for chicago/aicq. Provides the host resources the boot
 # needs (app:db, app:processes, gateway + api router, env storage, a
 # permissive actor scope) and wires them through wippy/bootloader, so the
-# module's *_test.lua suites run in isolation. The shell and the base come
-# from their sibling working copies, the platform (kickside/agents, models,
-# users, component, wippy/session) from the stand-ins in ../stubs
-# (test/.wippy.yaml).
+# module's *_test.lua suites run in isolation. The shell and the base are
+# resolved from their GitHub repositories by tag (wippy.lock), the platform
+# (kickside/agents, models, users, component, wippy/session) from the
+# stand-ins in ../stubs (test/.wippy.yaml).
 #
 # The presence service and the messenger start here as they would in an
 # application: people_test talks to both.
@@ -74,11 +74,11 @@ entries:
         value: app:processes
 
   - name: aicq_harness.dep.shell
-    version: "*"
+    version: ">=0.2.0"
     kind: ns.dependency
     meta:
-      comment: "The Chicago shell the module runs in; from ../../windows-module."
-    component: "chicago/shell"
+      comment: "The Chicago shell the module runs in; from its GitHub repository by tag, the same source the module names."
+    component: github.com/chicago-desktop/shell
     parameters:
       - name: chicago.shell:api_router
         value: app:api

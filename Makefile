@@ -1,4 +1,4 @@
-# chicago/aicq — lint and test on the local runtime build.
+# chicago/aicq — lint and test on the runtime fork's build.
 
 # pipefail lets the test target both stream runner output and keep its exit
 # code while grepping the log afterwards.
@@ -8,10 +8,13 @@ SHELL := bash
 .PHONY: lint test icons
 
 # The shell this module runs in declares entries with the `gfx` module, and
-# only the local runtime build has it: the release `wippy` does not load such
-# a module at all ("node with ID … not found"). Override with one variable:
+# only the runtime fork has it (chicago-desktop/runtime, a build from its
+# releases, v0.3.40a-chicago.2 or newer — the one that also resolves the
+# shell and the base from their GitHub repositories by tag): the release
+# `wippy` does not load such a module at all ("node with ID … not found").
+# Point WIPPY at the fork's binary:
 #
-#   make test WIPPY=wippy
+#   make test WIPPY=~/src/runtime/dist/wippy-linux-amd64
 WIPPY ?= $(HOME)/repos/wippy/runtime/dist/wippy-linux-amd64
 
 # The shell declares its own terminal.host, and the CLI then refuses to pick

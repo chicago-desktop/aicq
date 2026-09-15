@@ -6,10 +6,10 @@ version: "1.0"
 workspace:
   replacements:
     chicago/aicq: ..
-    # The shell and the base are not in the Hub yet: they come from the
-    # neighbouring working copies. Remove both once they are published.
-    chicago/shell: ../../windows-module
-    chicago/tui-desktop: ../../kickside-module
+    # The shell and the base are resolved from their GitHub repositories by
+    # tag (wippy.lock). To test against a working copy of the shell, add a
+    # replacement here and remove it again before committing:
+    #   chicago/shell: ../../windows-module
     # The platform is stood in, not booted: each stand-in carries only the
     # libraries aICQ imports (test/stubs/*, README "Development"). Their lock
     # entries keep the real versions, without a hash, so the module's lower

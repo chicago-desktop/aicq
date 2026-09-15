@@ -37,22 +37,27 @@ entries:
     component: wippy/migration
 
   # The shell: the window SDK (`app`, `ui`, `editor`, `render`) and the
-  # desktop family it names (`chicago.shell.api:control`).
-  - version: "*"
+  # desktop family it names (`chicago.shell.api:control`). The shell and
+  # the base are resolved from their GitHub repositories by tag —
+  # `component` names the repository, the module keeps its own name
+  # (chicago/shell, chicago/tui-desktop) in the lock; the range says what
+  # aICQ was written against (v0.2.0 is the first tag of both), the lock
+  # holds the exact one.
+  - version: ">=0.2.0"
     name: dep.chicago.shell
     kind: ns.dependency
     meta:
       comment: "The Chicago shell — the window SDK and the desktops whose tray gets aICQ's item."
-    component: chicago/shell
+    component: github.com/chicago-desktop/shell
 
   # The base: the window API (open a window, list the desktops, the tray
   # command) and its text helpers.
-  - version: "*"
+  - version: ">=0.2.0"
     name: dep.chicago.tui_desktop
     kind: ns.dependency
     meta:
       comment: "The desktop base — the window API and the tray command."
-    component: chicago/tui-desktop
+    component: github.com/chicago-desktop/tui-desktop
 
   # The platform, at the versions the stand's lock pinned when aICQ moved out
   # (2026-09-15). The application binds their requirements; aICQ only calls

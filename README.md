@@ -86,15 +86,25 @@ The message topics (`aicq.*`) kept their names.
 ## Development
 
 ```bash
-make lint    # late locals, then `wippy lint` with the local runtime build
+make lint    # late locals, then `wippy lint` with the runtime fork's build
 make test    # the harness in test/ boots the module with the shell, the base and the platform stand-ins
 make icons   # redraw assets/images/{32,16}/*.png
 ```
 
-The shell declares entries with the `gfx` module, which only the local runtime
-build has. The Makefile therefore uses `~/repos/wippy/runtime/dist/wippy-linux-amd64`;
-override it with `WIPPY=…`. The shell and the base come from `../windows-module`
-and `../kickside-module`.
+**A build of the runtime fork from its releases is required**
+([chicago-desktop/runtime](https://github.com/chicago-desktop/runtime),
+`v0.3.40a-chicago.2` or newer): it resolves the shell and the base from
+GitHub by tag, and the shell declares entries with the `gfx` module, which
+the release runtime does not have. The Makefile uses
+`~/repos/wippy/runtime/dist/wippy-linux-amd64`; override it with `WIPPY=…`.
+
+`chicago/shell` and `chicago/tui-desktop` are resolved from their GitHub
+repositories by tag (`component: github.com/chicago-desktop/shell`,
+`version: ">=0.2.0"` in `src/_index.yaml`, the shell also in the harness;
+v0.2.0 is the first tag). No working copy of either is needed beside the
+module: `wippy update` here and in `test/` writes them into the two
+`wippy.lock` files, the first time by cloning them into `~/.wippy/git`. The
+platform (kickside/*, wippy/session) stays the Hub's.
 
 `make lint` checks the module against the real platform modules at the versions
 in `wippy.lock`. `make test` does not boot the platform: `test/stubs/` stands
