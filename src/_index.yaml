@@ -519,6 +519,8 @@ entries:
       - security
       - uuid
     imports:
+      dialog_args: chicago.aicq:dialog_args
+      editor: chicago.shell.sdk:editor
       app: chicago.shell.sdk:app
       desktop: chicago.tui_desktop.desktop:window_api
       text: chicago.tui_desktop.desktop:text
@@ -594,3 +596,8 @@ entries:
       agents: chicago.aicq:agents
     security:
       policies: [chicago.aicq:new_agent_scope]
+
+  - name: dialog_args
+    kind: library.lua
+    source: file://dialog_args.lua
+    modules: [json]

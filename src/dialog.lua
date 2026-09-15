@@ -13,6 +13,8 @@
 -- in the registry again.
 
 local app = require("app")
+local dialog_args = require("dialog_args")
+local editor = require("editor")
 local channel = require("channel")
 local json = require("json")
 local process = require("process")
@@ -131,17 +133,17 @@ local function lines_for(model: any, width: any): any
 end
 
 function definition.init(args: any, context: any): any
-    local raw = tostring(args or "")
-    local agent, title = raw:match("^(.-)\n(.*)$")
-    if not agent then agent, title = raw, raw end
+    local parsed, parse_error = dialog_args.parse(args)
+    local agent, title = parsed and parsed.agent or "", parsed and parsed.title or ""
     local model: any = {
         agent = trim(agent), title = trim(title) ~= "" and trim(title) or trim(agent),
-        messages = {}, revision = 0, draft = "", busy = false,
+        messages = {}, revision = 0, draft = parsed and parsed.draft or "", busy = false,
+        long_draft = parsed and parsed.draft ~= "",
         status = "connecting…", session_id = nil, pid = nil, user_id = nil,
         streaming = nil, -- the index of the agent's turn being written now
     }
     if model.agent == "" then
-        model.status = "no agent named: open the chat from the contact list"
+        model.status = parse_error or "no agent named: open the chat from the contact list"
         return model
     end
     local ok, why = connect(model, context)
@@ -154,8 +156,9 @@ function definition.view(model: any, context: any): any
     local can_send = model.pid ~= nil and not model.busy and trim(model.draft) ~= ""
     return {kind = "column", children = {
         {kind = "list", id = "log", items = lines, reveal = #lines},
-        {kind = "row", size = 2, gap = 1, children = {
-            {kind = "input", id = "draft", text = model.draft, disabled = model.pid == nil},
+        {kind = "row", size = model.long_draft and 7 or 2, gap = 1, children = {
+            model.long_draft and {kind = "editor", id = "draft", text = model.draft, wrap = true, read_only = model.pid == nil}
+                or {kind = "input", id = "draft", text = model.draft, disabled = model.pid == nil},
             {kind = "button", id = "send", size = 12, text = "Send", default = true, disabled = not can_send},
         }},
         {kind = "label", size = 1, text = model.status},
@@ -215,9 +218,11 @@ end
 
 function definition.update(model: any, action: any, context: any)
     if action.id == "draft" and action.type == "change" then
-        model.draft = tostring(action.value or "")
+        model.draft = model.long_draft and editor.text(context.editor("draft")) or tostring(action.value or "")
     elseif (action.id == "draft" or action.id == "send") and action.type == "activate" then
+        if model.long_draft then model.draft = editor.text(context.editor("draft")) end
         send(model)
+        if model.long_draft and model.busy then editor.set(context.editor("draft"), "") end
     elseif action.type == "key" and action.key_type == "esc" then
         context.close()
     elseif action.type == "channel" then

@@ -198,3 +198,17 @@ entries:
       test: wippy.test:test
       legacy: chicago.aicq:legacy
     method: run
+
+  - name: dialog_args_test
+    kind: function.lua
+    meta: {type: test, suite: chicago_aicq, group: aICQ}
+    source: file://dialog_args_test.lua
+    method: run
+    modules: [json]
+    imports:
+      test: wippy.test:test
+      args: chicago.aicq:dialog_args
+      dialog: chicago.aicq:dialog
+      app: chicago.shell.sdk:app
+      editor: chicago.shell.sdk:editor
+      ui: chicago.shell.sdk:ui
