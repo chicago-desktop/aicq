@@ -18,7 +18,7 @@ local channel = require("channel")
 local logger = require("logger")
 local people = require("people")
 
-local log = logger:named("windows.aicq.messenger")
+local log = logger:named("chicago.aicq.messenger")
 
 -- The state is a table, not locals: after an error under pcall in go-lua a
 -- closure and its owner stop sharing a local.

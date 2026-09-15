@@ -1,7 +1,7 @@
 -- aICQ's "Add Contact…" — ICQ's "Add/Invite Users": find a person by an
 -- e-mail, a name or a UIN, and add them to your contact list.
 --
--- All the logic is in `windows.aicq:aicq` (`find_*`); here are only the window's
+-- All the logic is in `chicago.aicq:aicq` (`find_*`); here are only the window's
 -- reads: the people library under the logged-on person's actor, and the news
 -- to the contact list whose pid is the window's argument.
 

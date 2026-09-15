@@ -18,14 +18,14 @@ change.
   **People** and **Agents**, each collapsible, each headed with ICQ 2000's
   counter `People (2/7)` — online / total. Inside a group online rows come
   first, then offline, then by name; the status is the picture, not a
-  sub-group. People carry the ICQ flower (`windows.aicq:images/aicq` online,
-  `aicq_off` offline); agents carry `windows.aicq:images/agent` (online) and
+  sub-group. People carry the ICQ flower (`chicago.aicq:images/aicq` online,
+  `aicq_off` offline); agents carry `chicago.aicq:images/agent` (online) and
   `agent_off` (grey). The old Online/Offline groups of agents go away. The
   two groups never mix: an agent is never shown under People, a person never
   under Agents, and each group has its own "Add…" (Add Contact… under
   People, Add Agent… under Agents).
 - A person with unread messages shows `Anna (2)` and the picture
-  `windows.aicq:images/message` (an envelope) instead of the flower until the
+  `chicago.aicq:images/message` (an envelope) instead of the flower until the
   messages are read.
 - **Add Contact…** (a button next to Add Agent…, and in the field's context
   menu): a dialog with one search field — an e-mail, a name (three letters
@@ -33,7 +33,7 @@ change.
   "Add/Invite Users".
 - Right click on a person: **Send Message**, ―, **Info…** (name, UIN,
   online or not, on how many desktops), **Remove Contact**.
-- Double click on a person opens the **message window** `windows.aicq:message`:
+- Double click on a person opens the **message window** `chicago.aicq:message`:
   titled `<name> - aICQ`, the history above (sender, time, text), an input
   below, **Send** (default; Ctrl+Enter), **Close**. Opening it marks that
   person's messages read. Messages arriving while it is open appear in it.
@@ -60,7 +60,7 @@ change.
 **The sender and the reader are the actor of the process, never a field of
 a message.** Every desktop spawns its windows under the person who logged
 on, so in a window `security.actor()` is that person. Rows are written and
-read by the window's own process (its policy `windows.aicq:window_db` gives
+read by the window's own process (its policy `chicago.aicq:window_db` gives
 `db.get` on the database the application names, `target_db`),
 with `from_id` / the reader's id taken from the actor. A message body field
 that names a user is ignored. The first task of the data half is to measure
@@ -70,9 +70,9 @@ id of the person who logged on, and to write the result here.
 **Measured 2026-09-15: it does.** The chain, each step read in code:
 `app.desktop:logon` → `kickside.users:session.mint(user)` →
 `security.new_actor(tostring(user.user_id), …)` → the token store keeps that
-actor → the shell's `windows.shell.logon:provider.redeem` gets it back
+actor → the shell's `chicago.shell.logon:provider.redeem` gets it back
 with `store:validate(token)` → the compositor spawns every window
-`:with_actor(IDENTITY.actor)` (`windows.tui_desktop.desktop:library`,
+`:with_actor(IDENTITY.actor)` (`chicago.tui_desktop.desktop:library`,
 `spawner`). On the stand's database the token store's own payload says the
 same: all 19 tokens minted by desktop logons (`meta.source = tui_desktop`)
 and all 6 web ones carry an `actor_id` that is a row of `app_users.user_id`
@@ -81,26 +81,26 @@ and all 6 web ones carry an `actor_id` that is a row of `app_users.user_id`
 
 ## 3. Data
 
-Migrations `windows.aicq:01_people` and `02_dismissed`, in the database the
+Migrations `chicago.aicq:01_people` and `02_dismissed`, in the database the
 application names (`target_db`). Where an application kept aICQ's rows in the
 stand's tables `app_chat_contacts`, `app_chat_messages` and
-`app_chat_dismissed`, they are copied over once (`windows.aicq:legacy`); a
+`app_chat_dismissed`, they are copied over once (`chicago.aicq:legacy`); a
 row already in the new table wins:
 
 ```
-windows_aicq_contacts  (owner_id TEXT, contact_id TEXT, created_at TEXT,
+chicago_aicq_contacts  (owner_id TEXT, contact_id TEXT, created_at TEXT,
                     PRIMARY KEY (owner_id, contact_id))
-windows_aicq_messages  (id TEXT PRIMARY KEY, from_id TEXT, to_id TEXT,
+chicago_aicq_messages  (id TEXT PRIMARY KEY, from_id TEXT, to_id TEXT,
                     body TEXT, created_at TEXT, read_at TEXT NULL)
                     index on (to_id, read_at), on (from_id, to_id, created_at)
-windows_aicq_dismissed (owner_id TEXT, other_id TEXT, dismissed_at TEXT,
+chicago_aicq_dismissed (owner_id TEXT, other_id TEXT, dismissed_at TEXT,
                     PRIMARY KEY (owner_id, other_id))      -- migration 02
 ```
 
 Contacts are one-way, as in ICQ without authorization: adding someone does
 not ask them. Sending does not require being in each other's list.
 
-## 4. The library `windows.aicq:people`
+## 4. The library `chicago.aicq:people`
 
 Runs in the calling window's process, under the caller's actor. Every
 function answers `value, nil` or `nil, reason` (a denial is named, not
@@ -112,7 +112,7 @@ turned into an empty list).
 | `contacts()` | the caller's contacts `{{id, name, uin, online, desktops, unread, listed, last_at}}`, by name, plus **everyone who has written to the caller and is not a contact** (`listed = false`, the Not in List group) unless dismissed after their last message — read or unread, newest conversation first. `last_at` is the pair's newest message either way (nil without messages); only a message FROM them undoes a dismissal; a person with unread messages is shown even when dismissed (the tray's envelope must point at a row). When presence could not be read, `online`/`desktops` are `nil` and the list's field `why` says why |
 | `find(query)` | at most 20 `{id, name, uin}` by name: exact e-mail (the query has `@`), UIN (9 digits), else a name prefix ≥ 3 letters matched against the full name only; the caller is left out; never e-mail addresses in the answer |
 | `add(user_id)`, `remove(user_id)` | `true`; `add` refuses the caller and an account the directory does not know |
-| `dismiss(user_id)` | `true`; takes a Not in List person off the list until they write again (a row in `windows_aicq_dismissed (owner_id, other_id, dismissed_at)`, migration 02); `add` clears it. Refuses the caller and an account the directory does not know |
+| `dismiss(user_id)` | `true`; takes a Not in List person off the list until they write again (a row in `chicago_aicq_dismissed (owner_id, other_id, dismissed_at)`, migration 02); `add` clears it. Refuses the caller and an account the directory does not know |
 | `send(to_id, text)` | the message id; stores the row, then tells the messenger. Refuses an empty text, one over 4000 characters, the caller, an unknown account. A third value names a messenger that was not reached — the row is stored all the same |
 | `history(user_id, limit)` | `{{id, from_id, to_id, body, at, read}}`, oldest first, the last `limit` (default 200, 1…1000) of the pair |
 | `mark_read(user_id)` | how many were marked; then `aicq.read` to the messenger, so the tray drops the envelope at once |
@@ -132,11 +132,11 @@ Reading other people's names and e-mails needs the users table. If the
 users module has a lookup a signed-in user may call, `find` uses it with
 its gate (`security.can("access", …)`: a window goes past the router, so it
 checks the handler's gate itself). If it has none, `find` goes through a function
-entry `windows.aicq:directory` with its own actor (a callee runs under its own
+entry `chicago.aicq:directory` with its own actor (a callee runs under its own
 declared actor — measured 2026-09-14) that answers only the three query
 shapes above and returns only `{id, name, uin}`.
 
-**Chosen 2026-09-15: the users module's lookup; `windows.aicq:directory` is
+**Chosen 2026-09-15: the users module's lookup; `chicago.aicq:directory` is
 not written.** It is the contract `kickside.contract:directory` (`search`,
 `resolve`, `exists`), the one the sharing picker uses. A signed-in user may
 call it: `contract.*` on `kickside.*` comes with the application's user group
@@ -167,15 +167,15 @@ that `exists` (which looks the account up directly) knows, both answer a
 refusal naming the 50, not an empty list. A name not found cannot be told
 apart from nobody.
 
-**The tray items are `windows.aicq:aicq`'s** — one builder each: the envelope
+**The tray items are `chicago.aicq:aicq`'s** — one builder each: the envelope
 `aicq.mail(unread, base)`, the flower `aicq.pick(agents, why, report, now,
 people)`, where `people` is how many people besides that desktop's own person
 are online (the title `2 people online, 4 agents`). The presence service
 only decides which one a desktop gets.
 
-## 5. The messenger service `windows.aicq:messenger`
+## 5. The messenger service `chicago.aicq:messenger`
 
-A `process.service` with `auto_start`, registered as `windows.aicq.messenger`,
+A `process.service` with `auto_start`, registered as `chicago.aicq.messenger`,
 its own actor. It stores nothing; the rows are already written.
 
 - `aicq.sent {message_id, to_id}` — from a sender's window after the insert.
@@ -198,7 +198,7 @@ its own actor. It stores nothing; the rows are already written.
   person needs are the ones about messages to them. The messenger monitors
   a watching process and drops its watches when it exits; `aicq.unwatch`
   without `user_id` drops all of the sender's.
-- The presence service (`windows.aicq:presence`) pushes the tray **per
+- The presence service (`chicago.aicq:presence`) pushes the tray **per
   desktop**: for each running desktop it reads `user.id` from
   `desktop.list`, counts that person's unread messages, and pushes the
   flower or the envelope with `aICQ (N)`. A desktop without a logged-on

@@ -75,9 +75,9 @@ end
 -- roads stood in: the guard, the real directory adapter, a recorder for what
 -- would go to the messenger, nobody online.
 local function fresh()
-    exec("DELETE FROM windows_aicq_contacts")
-    exec("DELETE FROM windows_aicq_messages")
-    exec("DELETE FROM windows_aicq_dismissed")
+    exec("DELETE FROM chicago_aicq_contacts")
+    exec("DELETE FROM chicago_aicq_messages")
+    exec("DELETE FROM chicago_aicq_dismissed")
     guard.who, guard.granted, guard.asked = nil, true, {}
     told.list = {}
     people.deps.security = {
@@ -135,14 +135,14 @@ end
 local function define_tests()
     test.describe("aICQ people", function()
         test.it("the migration made both tables and both indexes", function()
-            local found = rows("SELECT name FROM sqlite_master WHERE name LIKE 'windows_aicq_%'"
-                .. " OR name LIKE 'idx_windows_aicq_%' ORDER BY name")
+            local found = rows("SELECT name FROM sqlite_master WHERE name LIKE 'chicago_aicq_%'"
+                .. " OR name LIKE 'idx_chicago_aicq_%' ORDER BY name")
             test.eq(names((function()
                 local out = {}
                 for _, row in ipairs(found) do out[#out + 1] = {name = row.name} end
                 return out
-            end)()), "idx_windows_aicq_messages_pair|idx_windows_aicq_messages_unread"
-                .. "|windows_aicq_contacts|windows_aicq_dismissed|windows_aicq_messages")
+            end)()), "chicago_aicq_contacts|chicago_aicq_dismissed|chicago_aicq_messages"
+                .. "|idx_chicago_aicq_messages_pair|idx_chicago_aicq_messages_unread")
         end)
 
         test.it("display_name: the full name, else the e-mail, else the id", function()
@@ -157,13 +157,13 @@ local function define_tests()
             local me = assert(people.me())
             test.eq(me.id .. "|" .. me.name .. "|" .. tostring(me.uin), "u-anna|Anna Karenina|186565381")
             local id = assert(people.send(BOB.user_id, "hello"))
-            local row = rows("SELECT from_id, to_id FROM windows_aicq_messages WHERE id = $1", {id})[1]
+            local row = rows("SELECT from_id, to_id FROM chicago_aicq_messages WHERE id = $1", {id})[1]
             test.eq(row.from_id .. ">" .. row.to_id, "u-anna>u-bob", "the row's sender is the actor")
 
-            guard.who = actor("windows.aicq.presence", {})
+            guard.who = actor("chicago.aicq.presence", {})
             local none, why = people.send(BOB.user_id, "forged")
             test.is_nil(none)
-            test.eq(why, "the window runs under windows.aicq.presence, which is not a logged-on person")
+            test.eq(why, "the window runs under chicago.aicq.presence, which is not a logged-on person")
             test.is_nil(people.me(), "a service actor has no me")
             guard.who = actor("u-bob", {user_id = "u-anna"})
             test.is_nil(people.contacts(), "an actor whose meta names another account is not a person either")
@@ -171,7 +171,7 @@ local function define_tests()
             local list, lwhy = people.contacts()
             test.is_nil(list)
             test.eq(lwhy, "no one is logged on: the window runs without an actor")
-            test.eq(#rows("SELECT id FROM windows_aicq_messages"), 1, "the refused calls wrote nothing")
+            test.eq(#rows("SELECT id FROM chicago_aicq_messages"), 1, "the refused calls wrote nothing")
         end)
 
         test.it("contacts: add and its refusals, twice is once, names, presence, unread and the Not in list row", function()
@@ -186,7 +186,7 @@ local function define_tests()
             local ghost_ok, ghost_why = people.add("u-ghost")
             test.is_nil(ghost_ok)
             test.eq(ghost_why, "no such account: u-ghost")
-            test.eq(#rows("SELECT contact_id FROM windows_aicq_contacts WHERE owner_id = 'u-anna'"), 2, "and no second row")
+            test.eq(#rows("SELECT contact_id FROM chicago_aicq_contacts WHERE owner_id = 'u-anna'"), 2, "and no second row")
 
             be(DAVE)
             assert(people.send(ANNA.user_id, "hi Anna"))
@@ -237,7 +237,7 @@ local function define_tests()
             for _, one in ipairs(list) do lines[#lines + 1] = one.id .. "," .. tostring(one.listed) .. "," .. tostring(one.unread) end
             test.eq(table.concat(lines, "|"), "u-bob,true,1|u-yulia,false,0|u-dave,false,0",
                 "the contact first; then who wrote, read or not, newest conversation first")
-            local newest = rows("SELECT MAX(created_at) AS at FROM windows_aicq_messages WHERE from_id = 'u-yulia'")[1].at
+            local newest = rows("SELECT MAX(created_at) AS at FROM chicago_aicq_messages WHERE from_id = 'u-yulia'")[1].at
             test.eq(list[2].last_at, newest, "last_at is the pair's newest message")
             assert(people.send(DAVE.user_id, "a reply to Dave"))
             test.eq(ids(assert(people.contacts())), "u-bob|u-dave|u-yulia", "the caller's reply makes Dave's conversation the newest")
@@ -266,7 +266,7 @@ local function define_tests()
             test.eq(#assert(people.contacts()), 0, "the caller's own message does not undo the dismissal")
 
             test.eq(people.add(DAVE.user_id), true)
-            test.eq(#rows("SELECT other_id FROM windows_aicq_dismissed WHERE owner_id = 'u-anna'"), 0, "add clears the dismissal")
+            test.eq(#rows("SELECT other_id FROM chicago_aicq_dismissed WHERE owner_id = 'u-anna'"), 0, "add clears the dismissal")
             local added = assert(people.contacts())
             test.eq(added[1].id .. "," .. tostring(added[1].listed), "u-dave,true")
             test.eq(people.remove(DAVE.user_id), true)
@@ -312,7 +312,7 @@ local function define_tests()
                 if entry.body.message_id == last then heard = entry end
             end
             test.not_nil(heard, "the messenger is told of each message")
-            test.eq(heard.name .. "|" .. heard.topic .. "|" .. heard.body.to_id, "windows.aicq.messenger|aicq.sent|u-bob")
+            test.eq(heard.name .. "|" .. heard.topic .. "|" .. heard.body.to_id, "chicago.aicq.messenger|aicq.sent|u-bob")
 
             local function refused(to: string, text: string): any
                 local id, why = people.send(to, text)
@@ -326,12 +326,12 @@ local function define_tests()
             test.eq(refused(BOB.user_id, string.rep("я", 4001)), "the message is longer than 4000 characters")
             test.not_nil(people.send(BOB.user_id, string.rep("я", 4000)), "4000 characters (8000 bytes) are not too long")
 
-            people.deps.send = function(): (boolean, any) return false, "windows.aicq.messenger is not running (x)" end
+            people.deps.send = function(): (boolean, any) return false, "chicago.aicq.messenger is not running (x)" end
             local id, err, notice = people.send(BOB.user_id, "stored anyway")
             test.not_nil(id)
             test.is_nil(err)
-            test.eq(notice, "the message is stored, but the messenger did not hear of it: windows.aicq.messenger is not running (x)")
-            test.eq(#rows("SELECT id FROM windows_aicq_messages WHERE id = $1", {id}), 1)
+            test.eq(notice, "the message is stored, but the messenger did not hear of it: chicago.aicq.messenger is not running (x)")
+            test.eq(#rows("SELECT id FROM chicago_aicq_messages WHERE id = $1", {id}), 1)
         end)
 
         test.it("unread and mark_read: per sender, one person's only, once, the messenger told once", function()
@@ -532,7 +532,7 @@ local function define_tests()
             local mail = desk(ANNA, function(item: any): boolean return item.text == "aICQ (3)" end)
             test.not_nil(mail, "Anna's desktop gets the envelope")
             test.eq(table.concat({mail.key, mail.title, mail.image, mail.entry}, "|"),
-                "windows.aicq|3 new messages|windows.aicq:images/message|windows.aicq:contacts")
+                "chicago.aicq|3 new messages|chicago.aicq:images/message|chicago.aicq:contacts")
             local online = assert(people.online())
             test.eq(online["u-anna"], 1, "the service tells who is online and on how many desktops")
 
@@ -540,7 +540,7 @@ local function define_tests()
             test.eq(people.mark_read(BOB.user_id), 3)
             local flower = desk(ANNA, function(item: any): boolean return item.text == "aICQ" end)
             test.not_nil(flower, "0 unread: the flower again, without waiting for the tick")
-            test.eq(flower.title .. "|" .. flower.image, "0 people online, 4 agents|windows.aicq:images/aicq",
+            test.eq(flower.title .. "|" .. flower.image, "0 people online, 4 agents|chicago.aicq:images/aicq",
                 "nobody besides Anna online; the agents as the list reported")
 
             be(BOB)

@@ -1,8 +1,8 @@
-organization: windows
+organization: chicago
 module: aicq
 description: aICQ for the Windows 95 shell — people and agents in one ICQ-style contact list, messages between people, the dialog with an agent, and the tray item next to the clock.
 license: MIT
-repository: https://github.com/wippy-windows/aicq
+repository: https://github.com/chicago-desktop/aicq
 homepage: https://wippy.ai
 keywords:
   - kickside
@@ -24,4 +24,4 @@ exclude:
   - ".wippy:**"
 # The image pack lives outside src/ and is packed only when named here.
 embed:
-  - windows.aicq:images
+  - chicago.aicq:images

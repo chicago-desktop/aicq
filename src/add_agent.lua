@@ -1,6 +1,6 @@
 -- aICQ's "Add Agent" — in place of ICQ's "Add Users": create a new agent
 -- without leaving for the browser. A dialog on the shell's SDK; creating and
--- the list of models are the data layer `windows.aicq:agents`, that is, the same
+-- the list of models are the data layer `chicago.aicq:agents`, that is, the same
 -- libraries and gates as the web page "Agents".
 --
 -- The window's argument is the contact list's pid: after a success

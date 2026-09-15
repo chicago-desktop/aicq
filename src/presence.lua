@@ -34,7 +34,7 @@ local control = require("control")
 local aicq = require("aicq")
 local people = require("people")
 
-local log = logger:named("windows.aicq.presence")
+local log = logger:named("chicago.aicq.presence")
 
 local TICK = tostring(aicq.TICK_S) .. "s"
 -- The desktop families, from their owners: the Windows 95 shell's and the base's own.

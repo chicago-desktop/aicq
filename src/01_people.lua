@@ -32,8 +32,8 @@ local STATEMENTS = {
             read_at TEXT NULL
         )
     ]]},
-    {"the unread index", "CREATE INDEX idx_windows_aicq_messages_unread ON " .. MESSAGES .. " (to_id, read_at)"},
-    {"the pair index", "CREATE INDEX idx_windows_aicq_messages_pair ON " .. MESSAGES .. " (from_id, to_id, created_at)"},
+    {"the unread index", "CREATE INDEX idx_chicago_aicq_messages_unread ON " .. MESSAGES .. " (to_id, read_at)"},
+    {"the pair index", "CREATE INDEX idx_chicago_aicq_messages_pair ON " .. MESSAGES .. " (from_id, to_id, created_at)"},
 }
 
 local function up_on(driver: string): any
@@ -55,7 +55,7 @@ local function drop(db: any)
 end
 
 return require("migration").define(function()
-    migration("Create windows_aicq_contacts and windows_aicq_messages, moving the stand's rows", function()
+    migration("Create chicago_aicq_contacts and chicago_aicq_messages, moving the stand's rows", function()
         database("postgres", function()
             up(up_on("postgres"))
             down(drop)

@@ -29,12 +29,12 @@ local function define_tests()
     test.describe("aICQ migrations", function()
         test.it("the migrations created aICQ's three tables, and the old names are the stand's", function()
             local db = assert(sql.get("app:db"))
-            local found = rows(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'windows_aicq_%'"
+            local found = rows(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'chicago_aicq_%'"
                 .. " ORDER BY name")
             db:release()
             local names = {}
             for _, row in ipairs(found) do names[#names + 1] = row.name end
-            test.eq(table.concat(names, "|"), "windows_aicq_contacts|windows_aicq_dismissed|windows_aicq_messages")
+            test.eq(table.concat(names, "|"), "chicago_aicq_contacts|chicago_aicq_dismissed|chicago_aicq_messages")
             test.eq(legacy.CONTACTS .. "|" .. legacy.MESSAGES .. "|" .. legacy.DISMISSED,
                 "app_chat_contacts|app_chat_messages|app_chat_dismissed")
         end)

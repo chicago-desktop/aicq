@@ -4,7 +4,7 @@
 -- sender and the reader are always the actor — `security.actor():id()`,
 -- measured to be the users table id of the person logged on — and never a
 -- field of a message: no function here takes a user id for "me". Rows live
--- in windows_aicq_contacts and windows_aicq_messages (migration windows.aicq:01_people);
+-- in chicago_aicq_contacts and chicago_aicq_messages (migration chicago.aicq:01_people);
 -- the database is the one the application names (people.db_id).
 --
 -- Other people's names come through the users module's own lookup, the
@@ -17,7 +17,7 @@
 --
 -- The messenger and the presence service use the parts that need no actor:
 -- the watch table, a message's two ends, the unread count by an explicit id
--- and the presence tally. The tray items themselves are windows.aicq:aicq's.
+-- and the presence tally. The tray items themselves are chicago.aicq:aicq's.
 
 local sql = require("sql")
 local security = require("security")
@@ -32,11 +32,11 @@ local aicq = require("aicq")
 local people = {}
 
 -- The database is named once, by the application: the requirement
--- windows.aicq:target_db writes it into this migration's meta.target_db,
+-- chicago.aicq:target_db writes it into this migration's meta.target_db,
 -- and it is read back from there (people.db_id), as the shell's persist does.
-people.MIGRATION = "windows.aicq:01_people"
+people.MIGRATION = "chicago.aicq:01_people"
 
--- The names both halves use are windows.aicq:aicq's; one place for each.
+-- The names both halves use are chicago.aicq:aicq's; one place for each.
 -- Windows → messenger: WATCH, UNWATCH; messenger → windows: NEW; library →
 -- messenger: READ, after mark_read (the windows tell their contact list
 -- with aicq.SEEN, a topic of their own).
@@ -77,9 +77,9 @@ people.WHO_BUDGET = "2s"
 -- A message body as it arrives: one parse rule for the whole of aICQ.
 people.unwrap = aicq.unwrap
 
-local CONTACTS = "windows_aicq_contacts"
-local MESSAGES = "windows_aicq_messages"
-local DISMISSED = "windows_aicq_dismissed"
+local CONTACTS = "chicago_aicq_contacts"
+local MESSAGES = "chicago_aicq_messages"
+local DISMISSED = "chicago_aicq_dismissed"
 
 -- ─── helpers ────────────────────────────────────────────────────────────
 

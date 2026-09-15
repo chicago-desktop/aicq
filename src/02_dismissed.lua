@@ -31,7 +31,7 @@ local function drop(db: any)
 end
 
 return require("migration").define(function()
-    migration("Create windows_aicq_dismissed, moving the stand's dismissals", function()
+    migration("Create chicago_aicq_dismissed, moving the stand's dismissals", function()
         database("postgres", function()
             up(up_on("postgres"))
             down(drop)

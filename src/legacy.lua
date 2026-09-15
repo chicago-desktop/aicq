@@ -18,9 +18,9 @@ legacy.DISMISSED = "app_chat_dismissed"
 
 -- aICQ's own tables, named once: the migrations create them by these names.
 legacy.TABLES = {
-    contacts = "windows_aicq_contacts",
-    messages = "windows_aicq_messages",
-    dismissed = "windows_aicq_dismissed",
+    contacts = "chicago_aicq_contacts",
+    messages = "chicago_aicq_messages",
+    dismissed = "chicago_aicq_dismissed",
 }
 
 -- What each migration moves: the stand's table, aICQ's, and the columns.

@@ -1,8 +1,8 @@
 -- The aICQ contact list: People and Agents, apart, as ICQ 2000 kept its groups.
 --
--- All the logic is in `windows.aicq:aicq`; here are only the window's reads, handed
+-- All the logic is in `chicago.aicq:aicq`; here are only the window's reads, handed
 -- over as `sys`. Agents come from the same library as the master agent's
--- (`roster_list`), people from `windows.aicq:people`, both under the logged-on
+-- (`roster_list`), people from `chicago.aicq:people`, both under the logged-on
 -- person's actor: the list shows what the web interface shows. Enter, a second
 -- click on the selected row or a double click opens a person's message window
 -- or an agent's dialog; the right click opens the menu.
@@ -21,8 +21,8 @@ local agents = require("agents")
 local people = require("people")
 local aicq = require("aicq")
 
--- The "Add Agent…" window (`windows.aicq:agents` and `windows.aicq:new_agent`).
-local NEW_AGENT = "windows.aicq:new_agent"
+-- The "Add Agent…" window (`chicago.aicq:agents` and `chicago.aicq:new_agent`).
+local NEW_AGENT = "chicago.aicq:new_agent"
 
 -- The topics the list listens to: a new agent, the messenger's ping, a message
 -- window that has shown someone's messages, Add Contact's news.

@@ -10,11 +10,11 @@ modules:
       version: 0.1.49
     - name: kickside/users
       version: 0.1.41
-    - name: windows/aicq
+    - name: chicago/aicq
       version: 0.0.0
-    - name: windows/shell
+    - name: chicago/shell
       version: 0.0.0
-    - name: windows/tui-desktop
+    - name: chicago/tui-desktop
       version: 0.0.0
     - name: wippy/bootloader
       version: 0.3.14

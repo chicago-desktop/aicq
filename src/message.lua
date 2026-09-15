@@ -1,7 +1,7 @@
 -- The aICQ message window: a conversation with one person.
 --
 -- The history above (sender, time, text), the input below, Send (the
--- default; Ctrl+Enter) and Close. All the logic is in `windows.aicq:aicq`
+-- default; Ctrl+Enter) and Close. All the logic is in `chicago.aicq:aicq`
 -- (`talk_*`); here are only the window's reads, handed over as `sys`: the
 -- people library under the logged-on person's actor (who sends and who reads
 -- is that actor, never a field of a message — docs/aicq-people.md §2) and the

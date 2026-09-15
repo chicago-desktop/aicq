@@ -5,11 +5,11 @@ version: "1.0"
 # meta.command.security; suites run with `wippy test` (`make test`).
 workspace:
   replacements:
-    windows/aicq: ..
+    chicago/aicq: ..
     # The shell and the base are not in the Hub yet: they come from the
     # neighbouring working copies. Remove both once they are published.
-    windows/shell: ../../windows-module
-    windows/tui-desktop: ../../kickside-module
+    chicago/shell: ../../windows-module
+    chicago/tui-desktop: ../../kickside-module
     # The platform is stood in, not booted: each stand-in carries only the
     # libraries aICQ imports (test/stubs/*, README "Development"). Their lock
     # entries keep the real versions, without a hash, so the module's lower
@@ -20,18 +20,18 @@ workspace:
     kickside/component: ./stubs/component
     wippy/session: ./stubs/session
 override:
-  "windows.tui_desktop:exec:default_env.HOME": "${env:HOME}"
-  "windows.tui_desktop:exec:default_env.PATH": "${env:PATH}"
+  "chicago.tui_desktop:exec:default_env.HOME": "${env:HOME}"
+  "chicago.tui_desktop:exec:default_env.PATH": "${env:PATH}"
   # The shell and the base ask the application for the group given access to
   # their endpoints; the harness's permissive scope is enough for the suites.
-  "windows.shell.security:user_security_scope:data.default": app:user
-  "windows.tui_desktop.security:user_security_scope:data.default": app:user
+  "chicago.shell.security:user_security_scope:data.default": app:user
+  "chicago.tui_desktop.security:user_security_scope:data.default": app:user
 vars:
   pg_host: localhost
   pg_port: 5433
   # <org>_test_<module>: harnesses of different modules share one Postgres
   # server without colliding on database names.
-  pg_database: windows_test_aicq
+  pg_database: chicago_test_aicq
   pg_username: kickside
   pg_password: kickside
 profiles:

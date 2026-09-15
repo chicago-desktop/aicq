@@ -2,7 +2,7 @@
 -- counters, online rows first, the unread envelope, collapsing, the tray
 -- items, the context menus, the Info sheets, Remove Contact, Add Agent… and
 -- Add Contact…, the messenger's pings and the layout — all through the model
--- `windows.aicq:aicq` with a stand-in for the window's `sys`, without the roster,
+-- `chicago.aicq:aicq` with a stand-in for the window's `sys`, without the roster,
 -- the people library, the registry or the compositor.
 local test = require("test")
 local ui = require("ui")
@@ -18,7 +18,7 @@ local function roster(): any
     return {WRITER, ANALYST, SCOUT}
 end
 
--- Contacts as `windows.aicq:people.contacts` answers them. `boris` is in lower
+-- Contacts as `chicago.aicq:people.contacts` answers them. `boris` is in lower
 -- case (names sort without regard to case); Alice is offline and first by
 -- name (online rows still come first).
 local function people(): any
@@ -627,10 +627,10 @@ local function define_tests()
         test.it("the tray: the flower while anyone is online, people and agents apart; the envelope with aICQ (N) while unread", function()
             local on = aicq.tray(3)
             test.eq(table.concat({on.key, on.text, on.title, on.image, on.icon, on.entry, tostring(on.ttl)}, "|"),
-                "windows.aicq|aICQ|3 agents online|windows.aicq:images/aicq|✿|windows.aicq:contacts|180")
+                "chicago.aicq|aICQ|3 agents online|chicago.aicq:images/aicq|✿|chicago.aicq:contacts|180")
             test.eq(aicq.tray(1).title, "1 agent online")
             local off = aicq.tray(0)
-            test.eq(off.title .. "|" .. off.image .. "|" .. off.entry, "aICQ: offline|windows.aicq:images/aicq_off|windows.aicq:contacts")
+            test.eq(off.title .. "|" .. off.image .. "|" .. off.entry, "aICQ: offline|chicago.aicq:images/aicq_off|chicago.aicq:contacts")
             test.eq(aicq.tray(0, "denied").title, "aICQ: offline, the roster was not read: denied")
             test.eq(aicq.presence({WRITER, ARCHIVE}).title, "1 agent online", "the service counts by the list's rule")
             test.eq(aicq.presence(nil, "no actor").image, aicq.OFFLINE_IMAGE)
@@ -642,7 +642,7 @@ local function define_tests()
             test.eq(aicq.tray(0, "denied", 3).title, "3 people online, agents not read: denied")
             local mail = aicq.mail(3, on)
             test.eq(table.concat({mail.key, mail.text, mail.title, mail.image, mail.icon, mail.entry, tostring(mail.ttl)}, "|"),
-                "windows.aicq|aICQ (3)|3 new messages|windows.aicq:images/message|✉|windows.aicq:contacts|180")
+                "chicago.aicq|aICQ (3)|3 new messages|chicago.aicq:images/message|✉|chicago.aicq:contacts|180")
             test.eq(aicq.mail(1, on).title, "1 new message")
             test.is_true(aicq.mail(0, on) == on, "nothing unread: the flower as it was")
             test.is_true(aicq.mail(nil, off) == off)

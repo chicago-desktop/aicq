@@ -1,7 +1,7 @@
 -- aICQ's Add Contact: the search field, the results table (Name, UIN), Add by
 -- the button, by Enter on a row and by a second click, the news to the list,
 -- the people library's refusals in its own words, and the layout — through
--- the model `windows.aicq:aicq` (`find_*`) with a stand-in `sys`.
+-- the model `chicago.aicq:aicq` (`find_*`) with a stand-in `sys`.
 local test = require("test")
 local ui = require("ui")
 local app = require("app")

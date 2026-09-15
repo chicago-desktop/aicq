@@ -8,5 +8,5 @@ version: "1.0"
 # the Hub's, at the versions in wippy.lock.
 workspace:
   replacements:
-    windows/shell: ../windows-module
-    windows/tui-desktop: ../kickside-module
+    chicago/shell: ../windows-module
+    chicago/tui-desktop: ../kickside-module

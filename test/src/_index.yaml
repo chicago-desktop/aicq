@@ -1,7 +1,7 @@
 version: "1.0"
 namespace: app
 
-# Standalone harness for windows/aicq. Provides the host resources the boot
+# Standalone harness for chicago/aicq. Provides the host resources the boot
 # needs (app:db, app:processes, gateway + api router, env storage, a
 # permissive actor scope) and wires them through wippy/bootloader, so the
 # module's *_test.lua suites run in isolation. The shell and the base come
@@ -66,11 +66,11 @@ entries:
     kind: ns.dependency
     meta:
       comment: "The module under test."
-    component: "windows/aicq"
+    component: "chicago/aicq"
     parameters:
-      - name: windows.aicq:target_db
+      - name: chicago.aicq:target_db
         value: app:db
-      - name: windows.aicq:process_host
+      - name: chicago.aicq:process_host
         value: app:processes
 
   - name: aicq_harness.dep.shell
@@ -78,9 +78,9 @@ entries:
     kind: ns.dependency
     meta:
       comment: "The Windows 95 shell the module runs in; from ../../windows-module."
-    component: "windows/shell"
+    component: "chicago/shell"
     parameters:
-      - name: windows.shell:api_router
+      - name: chicago.shell:api_router
         value: app:api
 
   - name: aicq_harness.dep.migration
@@ -122,12 +122,12 @@ entries:
       type: test
       comment: "aICQ's contact list — People and Agents apart with online/total counters, online first, the unread envelope, collapsing, the menus, the Info sheets, Remove Contact, both Add items, the messenger's pings, the tray items and the layout."
       group: aICQ
-      suite: windows_aicq
+      suite: chicago_aicq
     source: file://aicq_test.lua
     imports:
       test: wippy.test:test
-      ui: windows.shell.sdk:ui
-      aicq: windows.aicq:aicq
+      ui: chicago.shell.sdk:ui
+      aicq: chicago.aicq:aicq
     method: run
 
   - name: message_test
@@ -136,14 +136,14 @@ entries:
       type: test
       comment: "aICQ's message window — the history loaded, marked read and watched on opening, Send and both shapes of Ctrl+Enter, the messenger's pings, the named failures and the layout."
       group: aICQ
-      suite: windows_aicq
+      suite: chicago_aicq
     source: file://message_test.lua
     imports:
       test: wippy.test:test
-      ui: windows.shell.sdk:ui
-      app: windows.shell.sdk:app
-      editor: windows.shell.sdk:editor
-      aicq: windows.aicq:aicq
+      ui: chicago.shell.sdk:ui
+      app: chicago.shell.sdk:app
+      editor: chicago.shell.sdk:editor
+      aicq: chicago.aicq:aicq
     method: run
 
   - name: add_contact_test
@@ -152,13 +152,13 @@ entries:
       type: test
       comment: "aICQ's Add Contact — the search, the Name and UIN table, Add three ways, the news to the list, the library's refusals and the layout."
       group: aICQ
-      suite: windows_aicq
+      suite: chicago_aicq
     source: file://add_contact_test.lua
     imports:
       test: wippy.test:test
-      ui: windows.shell.sdk:ui
-      app: windows.shell.sdk:app
-      aicq: windows.aicq:aicq
+      ui: chicago.shell.sdk:ui
+      app: chicago.shell.sdk:app
+      aicq: chicago.aicq:aicq
     method: run
 
   # `directory` is kickside/users' stand-in adapter over the harness's users
@@ -169,7 +169,7 @@ entries:
       type: test
       comment: "aICQ people — the library on a real SQLite (contacts, send, history order and limit, unread, mark_read, find's three shapes and the cap, UIN, display_name), identity from the actor, the messenger's pings and the per-desktop tray."
       group: aICQ
-      suite: windows_aicq
+      suite: chicago_aicq
     source: file://people_test.lua
     modules:
       - channel
@@ -178,10 +178,10 @@ entries:
       - time
     imports:
       test: wippy.test:test
-      people: windows.aicq:people
+      people: chicago.aicq:people
       directory: kickside.users.directory:directory_lib
       user_repo: kickside.users.persist:user_repo
-      control: windows.shell.api:control
+      control: chicago.shell.api:control
     method: run
 
   - name: legacy_test
@@ -190,11 +190,11 @@ entries:
       type: test
       comment: "aICQ's migrations — the stand's app_chat_* rows move over once, a row already there wins, no old table is nothing to do."
       group: aICQ
-      suite: windows_aicq
+      suite: chicago_aicq
     source: file://legacy_test.lua
     modules:
       - sql
     imports:
       test: wippy.test:test
-      legacy: windows.aicq:legacy
+      legacy: chicago.aicq:legacy
     method: run

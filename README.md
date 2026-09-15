@@ -1,6 +1,6 @@
-# windows/aicq
+# chicago/aicq
 
-aICQ for the Windows 95 shell (`windows/shell`), in the manner of ICQ:
+aICQ for the Windows 95 shell (`chicago/shell`), in the manner of ICQ:
 
 - one **contact list** with two groups that never mix — **People** and
   **Agents**, each headed `People (2/7)` (online / total), online first, the
@@ -19,7 +19,7 @@ The contract — who is who, the tables, presence, delivery — is
 
 ## Parts
 
-Namespace `windows.aicq`.
+Namespace `chicago.aicq`.
 
 | Entry | What |
 |---|---|
@@ -28,30 +28,30 @@ Namespace `windows.aicq`.
 | `dialog`, `new_agent` + `agents` | The agent dialog on the stock session, and Add Agent with the libraries of the web page "Agents". |
 | `aicq` | The pure model the windows and the presence service share: groups, rows, menus, Info sheets, tray items. |
 | `people` | People's data under the caller's actor: contacts, messages, unread counts, find through the users directory behind its gate. |
-| `messenger` + `messenger.service` | Pings the windows watching either end of a stored message; stores nothing. Registered as `windows.aicq.messenger`, actor `windows.aicq.messenger`. |
-| `presence` + `presence.service` | Asks every desktop who is logged on and puts the item in each tray; answers `aicq.who`. Registered as `windows.aicq.presence`, actor `windows.aicq.presence`. |
-| `01_people`, `02_dismissed` + `legacy` | The tables `windows_aicq_contacts`, `windows_aicq_messages`, `windows_aicq_dismissed`, and the one-time move of an application's `app_chat_*` rows. |
-| `images` | The image pack under `assets/images` (32 and 16 px), called `windows.aicq:images/<name>`; drawn by `tools/chat_icons.py`. |
+| `messenger` + `messenger.service` | Pings the windows watching either end of a stored message; stores nothing. Registered as `chicago.aicq.messenger`, actor `chicago.aicq.messenger`. |
+| `presence` + `presence.service` | Asks every desktop who is logged on and puts the item in each tray; answers `aicq.who`. Registered as `chicago.aicq.presence`, actor `chicago.aicq.presence`. |
+| `01_people`, `02_dismissed` + `legacy` | The tables `chicago_aicq_contacts`, `chicago_aicq_messages`, `chicago_aicq_dismissed`, and the one-time move of an application's `app_chat_*` rows. |
+| `images` | The image pack under `assets/images` (32 and 16 px), called `chicago.aicq:images/<name>`; drawn by `tools/chat_icons.py`. |
 
-The tray item's key is `windows.aicq`; an item not refreshed for 180 s is
+The tray item's key is `chicago.aicq`; an item not refreshed for 180 s is
 removed by the compositor.
 
 ## What the application provides
 
 | Requirement | Default | What |
 |---|---|---|
-| `windows.aicq:target_db` | `app:db` | The database of aICQ's tables. The people library reads it back from the migration entry; the windows and both services get `db.get` on it. |
-| `windows.aicq:process_host` | `app:processes` | The host the presence service and the messenger run on. |
+| `chicago.aicq:target_db` | `app:db` | The database of aICQ's tables. The people library reads it back from the migration entry; the windows and both services get `db.get` on it. |
+| `chicago.aicq:process_host` | `app:processes` | The host the presence service and the messenger run on. |
 
 ```yaml
-- name: windows-aicq
+- name: chicago-aicq
   kind: ns.dependency
-  component: windows/aicq
+  component: chicago/aicq
   version: "*"
   parameters:
-    - name: windows.aicq:target_db
+    - name: chicago.aicq:target_db
       value: app:db
-    - name: windows.aicq:process_host
+    - name: chicago.aicq:process_host
       value: app:processes
 ```
 
@@ -78,9 +78,9 @@ Before this module aICQ lived in an application's `src/app/chat` (namespace
 `app.chat`, tables `app_chat_*`). The migrations copy those rows into the new
 tables when the old tables exist, so contact lists, history and dismissals
 survive the switch; a row already in the new table wins. The entry ids moved
-to the new namespace (`app.chat:contacts` → `windows.aicq:contacts`), and so
-did the service names (`app.chat.presence` → `windows.aicq.presence`, the
-same for the messenger) and the tray key (`app.chat` → `windows.aicq`).
+to the new namespace (`app.chat:contacts` → `chicago.aicq:contacts`), and so
+did the service names (`app.chat.presence` → `chicago.aicq.presence`, the
+same for the messenger) and the tray key (`app.chat` → `chicago.aicq`).
 The message topics (`aicq.*`) kept their names.
 
 ## Development

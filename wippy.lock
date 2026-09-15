@@ -41,9 +41,9 @@ modules:
     - name: kickside/users
       version: 0.1.41
       hash: c7508fd69b6da9f9d6a512bb98067634d4b56027986111e65d159a06485418e8
-    - name: windows/shell
+    - name: chicago/shell
       version: 0.0.0
-    - name: windows/tui-desktop
+    - name: chicago/tui-desktop
       version: 0.0.0
     - name: wippy/agent
       version: 0.4.17

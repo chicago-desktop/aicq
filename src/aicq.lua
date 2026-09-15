@@ -14,23 +14,23 @@
 -- roster (`kickside.agents.traits:roster_list`) lists it, and the roster lists
 -- ONLY reachable agents: an agent is offline only when the roster itself says
 -- `reachable = false`. A person is online while a running desktop reports them
--- (`windows.aicq:people`, §4).
+-- (`chicago.aicq:people`, §4).
 
 local ui = require("ui")
 local editor = require("editor")
 
 local aicq = {}
 
-aicq.TRAY_KEY = "windows.aicq"
-aicq.CONTACTS = "windows.aicq:contacts"
-aicq.DIALOG = "windows.aicq:dialog"
-aicq.MESSAGE = "windows.aicq:message"
-aicq.ADD_CONTACT_WINDOW = "windows.aicq:add_contact"
-aicq.ONLINE_IMAGE = "windows.aicq:images/aicq"
-aicq.OFFLINE_IMAGE = "windows.aicq:images/aicq_off"
-aicq.AGENT_IMAGE = "windows.aicq:images/agent"
-aicq.AGENT_OFF_IMAGE = "windows.aicq:images/agent_off"
-aicq.MESSAGE_IMAGE = "windows.aicq:images/message"
+aicq.TRAY_KEY = "chicago.aicq"
+aicq.CONTACTS = "chicago.aicq:contacts"
+aicq.DIALOG = "chicago.aicq:dialog"
+aicq.MESSAGE = "chicago.aicq:message"
+aicq.ADD_CONTACT_WINDOW = "chicago.aicq:add_contact"
+aicq.ONLINE_IMAGE = "chicago.aicq:images/aicq"
+aicq.OFFLINE_IMAGE = "chicago.aicq:images/aicq_off"
+aicq.AGENT_IMAGE = "chicago.aicq:images/agent"
+aicq.AGENT_OFF_IMAGE = "chicago.aicq:images/agent_off"
+aicq.MESSAGE_IMAGE = "chicago.aicq:images/message"
 -- One character one cell wide each: the flower and the envelope in a cells tray.
 aicq.ICON = "✿"
 aicq.MAIL_ICON = "✉"
@@ -49,7 +49,7 @@ aicq.GROUPS = {"people", "strangers", "agents"}
 -- sees their agents too); the service believes the report while it is younger
 -- than two of its ticks, and the list reloads every tick, so the report does
 -- not age while the list is open.
-aicq.SERVICE = "windows.aicq.presence"
+aicq.SERVICE = "chicago.aicq.presence"
 aicq.REPORT = "aicq.presence_report"
 aicq.TICK_S = 60
 aicq.REPORT_TTL_S = 2 * aicq.TICK_S
@@ -57,7 +57,7 @@ aicq.REPORT_TTL_S = 2 * aicq.TICK_S
 -- they are said in one place. A window watches its OWN person: the messenger
 -- pings the watchers of either end of a message with `aicq.new`. `aicq.read`
 -- goes to the messenger after `mark_read` (the library sends it).
-aicq.MESSENGER = "windows.aicq.messenger"
+aicq.MESSENGER = "chicago.aicq.messenger"
 aicq.NEW = "aicq.new"
 aicq.WATCH = "aicq.watch"
 aicq.UNWATCH = "aicq.unwatch"
@@ -388,7 +388,7 @@ end
 
 -- init(sys) -> the model. `sys` — the window's reads:
 --   roster() -> agents, truncated              (raises on a refusal)
---   contacts() -> people, why                  (windows.aicq:people.contacts)
+--   contacts() -> people, why                  (chicago.aicq:people.contacts)
 --   open(agent) -> ok, why                     (the agent's dialog window)
 --   message({id, name}) -> ok, why             (the message window)
 --   add() -> ok, why                           (the "Add Agent…" window)

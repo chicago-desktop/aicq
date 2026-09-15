@@ -1,4 +1,4 @@
-# windows/aicq — lint and test on the local runtime build.
+# chicago/aicq — lint and test on the local runtime build.
 
 # pipefail lets the test target both stream runner output and keep its exit
 # code while grepping the log afterwards.

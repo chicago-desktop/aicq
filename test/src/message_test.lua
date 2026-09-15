@@ -2,7 +2,7 @@
 -- watches the window's own person at the messenger; Send and Ctrl+Enter (both
 -- of its shapes) send the input; the messenger's ping about a message between
 -- the two reloads; failures are named; the layout stands apart — through the
--- model `windows.aicq:aicq` (`talk_*`) with a stand-in `sys`, the SDK's own
+-- model `chicago.aicq:aicq` (`talk_*`) with a stand-in `sys`, the SDK's own
 -- context, editor and plan.
 local test = require("test")
 local ui = require("ui")

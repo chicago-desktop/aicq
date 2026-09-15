@@ -1,16 +1,16 @@
 version: "1.0"
-namespace: windows.aicq
+namespace: chicago.aicq
 
 # aICQ for the Windows 95 shell — the contact list of people and agents, the
 # message window between people and the dialog with an agent, in the manner
 # of ICQ (docs/aicq-people.md).
 #
 # The windows are declarative applications on the shell's SDK, their logic
-# the pure library windows.aicq:aicq. The agent dialog has no conversation
+# the pure library chicago.aicq:aicq. The agent dialog has no conversation
 # mechanics of its own: it raises the stock session process of wippy/session
 # — the one the web chat uses — and listens to its events; that history lies
 # in the session's tables. Messages between people are rows of
-# windows.aicq:people, read and written by the window's own process.
+# chicago.aicq:people, read and written by the window's own process.
 #
 # The platform comes from the application: the agents, the model catalog, the
 # users directory and components (kickside/*), and the sessions
@@ -37,22 +37,22 @@ entries:
     component: wippy/migration
 
   # The shell: the window SDK (`app`, `ui`, `editor`, `render`) and the
-  # desktop family it names (`windows.shell.api:control`).
+  # desktop family it names (`chicago.shell.api:control`).
   - version: "*"
-    name: dep.windows.shell
+    name: dep.chicago.shell
     kind: ns.dependency
     meta:
       comment: "The Windows 95 shell — the window SDK and the desktops whose tray gets aICQ's item."
-    component: windows/shell
+    component: chicago/shell
 
   # The base: the window API (open a window, list the desktops, the tray
   # command) and its text helpers.
   - version: "*"
-    name: dep.windows.tui_desktop
+    name: dep.chicago.tui_desktop
     kind: ns.dependency
     meta:
       comment: "The desktop base — the window API and the tray command."
-    component: windows/tui-desktop
+    component: chicago/tui-desktop
 
   # The platform, at the versions the stand's lock pinned when aICQ moved out
   # (2026-09-15). The application binds their requirements; aICQ only calls
@@ -103,15 +103,15 @@ entries:
       comment: "The database aICQ keeps its contacts, messages and dismissals in."
     default: app:db
     targets:
-      - entry: windows.aicq:01_people
+      - entry: chicago.aicq:01_people
         path: .meta.target_db
-      - entry: windows.aicq:02_dismissed
+      - entry: chicago.aicq:02_dismissed
         path: .meta.target_db
-      - entry: windows.aicq:window_db
+      - entry: chicago.aicq:window_db
         path: .policy.resources +=
-      - entry: windows.aicq:presence_db
+      - entry: chicago.aicq:presence_db
         path: .policy.resources +=
-      - entry: windows.aicq:messenger_db
+      - entry: chicago.aicq:messenger_db
         path: .policy.resources +=
 
   - name: process_host
@@ -120,13 +120,13 @@ entries:
       comment: "The process host the presence service and the messenger run on."
     default: app:processes
     targets:
-      - entry: windows.aicq:presence.service
+      - entry: chicago.aicq:presence.service
         path: .host
-      - entry: windows.aicq:messenger.service
+      - entry: chicago.aicq:messenger.service
         path: .host
 
   # ─── Shared ───────────────────────────────────────────────────────────
-  # windows.aicq:images
+  # chicago.aicq:images
   #
   # aICQ's pictures — an image pack of the shell: `aicq` (a person online,
   # the contact list's flower), `aicq_off` (the same in grey, offline),
@@ -138,23 +138,23 @@ entries:
   - name: images
     kind: fs.directory
     meta:
-      type: windows.images
+      type: chicago.images
       comment: "aICQ's pictures — an image pack of the Windows 95 shell, own pixel art."
     auto_init: false
     base: module
     directory: ./assets/images
 
-  # windows.aicq:aicq
+  # chicago.aicq:aicq
   - name: aicq
     kind: library.lua
     meta:
       comment: "aICQ's model — the People, Not in List and Agents groups, the tree's rows and menus, the Info sheets, Remove Contact, the message window with Add to List, Add Contact and the tray items; pure functions for the windows and the presence service."
     source: file://aicq.lua
     imports:
-      ui: windows.shell.sdk:ui
-      editor: windows.shell.sdk:editor
+      ui: chicago.shell.sdk:ui
+      editor: chicago.shell.sdk:editor
 
-  # windows.aicq:people
+  # chicago.aicq:people
   #
   # Runs in the calling window's process under the logged-on person's actor,
   # and in the two services under theirs.
@@ -173,7 +173,7 @@ entries:
       - time
       - uuid
     imports:
-      aicq: windows.aicq:aicq
+      aicq: chicago.aicq:aicq
 
   # The database name lives on the migration entry; every process that uses
   # the people library reads it from there.
@@ -185,18 +185,18 @@ entries:
       actions:
         - registry.get
       resources:
-        - windows.aicq:01_people
+        - chicago.aicq:01_people
       effect: allow
 
   # ─── The migrations ───────────────────────────────────────────────────
-  # windows.aicq:legacy
+  # chicago.aicq:legacy
   - name: legacy
     kind: library.lua
     meta:
       comment: "The one-time move of the stand's app_chat_* rows into aICQ's tables — copy where the old table exists, a row already there wins."
     source: file://legacy.lua
 
-  # windows.aicq:01_people — meta.target_db comes from `target_db`.
+  # chicago.aicq:01_people — meta.target_db comes from `target_db`.
   - name: 01_people
     kind: function.lua
     meta:
@@ -206,10 +206,10 @@ entries:
     source: file://01_people.lua
     imports:
       migration: wippy.migration:migration
-      legacy: windows.aicq:legacy
+      legacy: chicago.aicq:legacy
     method: migrate
 
-  # windows.aicq:02_dismissed
+  # chicago.aicq:02_dismissed
   - name: 02_dismissed
     kind: function.lua
     meta:
@@ -219,7 +219,7 @@ entries:
     source: file://02_dismissed.lua
     imports:
       migration: wippy.migration:migration
-      legacy: windows.aicq:legacy
+      legacy: chicago.aicq:legacy
     method: migrate
 
   # ─── The presence service ─────────────────────────────────────────────
@@ -230,7 +230,7 @@ entries:
   - name: presence_scope
     kind: security.policy
     meta:
-      comment: "aICQ presence service — take the name windows.aicq.presence, find the desktops, ask who is logged on, put the item in each tray and answer aicq.who."
+      comment: "aICQ presence service — take the name chicago.aicq.presence, find the desktops, ask who is logged on, put the item in each tray and answer aicq.who."
     policy:
       actions:
         - process.registry
@@ -265,7 +265,7 @@ entries:
       resources: []
       effect: allow
 
-  # windows.aicq:presence
+  # chicago.aicq:presence
   - name: presence
     kind: process.lua
     meta:
@@ -278,18 +278,18 @@ entries:
       - process
       - time
     imports:
-      desktop: windows.tui_desktop.desktop:window_api
-      control: windows.shell.api:control
+      desktop: chicago.tui_desktop.desktop:window_api
+      control: chicago.shell.api:control
       roster: kickside.agents.traits:roster_list
-      aicq: windows.aicq:aicq
-      people: windows.aicq:people
+      aicq: chicago.aicq:aicq
+      people: chicago.aicq:people
 
-  # windows.aicq:presence.service — its host is `process_host`'s.
+  # chicago.aicq:presence.service — its host is `process_host`'s.
   - name: presence.service
     kind: process.service
     meta:
       comment: "Keeps the aICQ presence service running — the tray item is there with the contact list closed too."
-    process: windows.aicq:presence
+    process: chicago.aicq:presence
     lifecycle:
       auto_start: true
       restart:
@@ -298,17 +298,17 @@ entries:
         backoff_factor: 2.0
       security:
         actor:
-          id: windows.aicq.presence
+          id: chicago.aicq.presence
         policies:
-          - windows.aicq:presence_scope
-          - windows.aicq:presence_registry
-          - windows.aicq:presence_db
+          - chicago.aicq:presence_scope
+          - chicago.aicq:presence_registry
+          - chicago.aicq:presence_db
 
   # ─── The messenger ────────────────────────────────────────────────────
   - name: messenger_scope
     kind: security.policy
     meta:
-      comment: "aICQ messenger — take the name windows.aicq.messenger, monitor the watching windows, ping them and ask the presence service to refresh a tray."
+      comment: "aICQ messenger — take the name chicago.aicq.messenger, monitor the watching windows, ping them and ask the presence service to refresh a tray."
     policy:
       actions:
         - process.registry
@@ -331,7 +331,7 @@ entries:
       resources: []
       effect: allow
 
-  # windows.aicq:messenger
+  # chicago.aicq:messenger
   - name: messenger
     kind: process.lua
     meta:
@@ -343,14 +343,14 @@ entries:
       - logger
       - process
     imports:
-      people: windows.aicq:people
+      people: chicago.aicq:people
 
-  # windows.aicq:messenger.service — its host is `process_host`'s.
+  # chicago.aicq:messenger.service — its host is `process_host`'s.
   - name: messenger.service
     kind: process.service
     meta:
-      comment: "Keeps the aICQ messenger running under its own actor, registered as windows.aicq.messenger."
-    process: windows.aicq:messenger
+      comment: "Keeps the aICQ messenger running under its own actor, registered as chicago.aicq.messenger."
+    process: chicago.aicq:messenger
     lifecycle:
       auto_start: true
       restart:
@@ -359,14 +359,14 @@ entries:
         backoff_factor: 2.0
       security:
         actor:
-          id: windows.aicq.messenger
+          id: chicago.aicq.messenger
         policies:
-          - windows.aicq:messenger_scope
-          - windows.aicq:messenger_db
-          - windows.aicq:db_name
+          - chicago.aicq:messenger_scope
+          - chicago.aicq:messenger_db
+          - chicago.aicq:db_name
 
   # ─── The windows ──────────────────────────────────────────────────────
-  # windows.aicq:window_scope
+  # chicago.aicq:window_scope
   - name: window_scope
     kind: security.policy
     meta:
@@ -391,13 +391,13 @@ entries:
       resources: []
       effect: allow
 
-  # windows.aicq:contacts
+  # chicago.aicq:contacts
   - name: contacts
     kind: process.lua
     meta:
       type: tui_desktop.window
       title: aICQ
-      image: windows.aicq:images/aicq
+      image: chicago.aicq:images/aicq
       icon: "☺"
       group: Programs
       order: 20
@@ -405,8 +405,8 @@ entries:
       height: 24
       window_type: app
       resizable: true
-      pixel_render: windows.shell.sdk:render
-      pixel_state: windows.aicq:contacts
+      pixel_render: chicago.shell.sdk:render
+      pixel_state: chicago.aicq:contacts
       comment: "aICQ's contact list — People, Not in List and Agents; a double click or Enter opens a person's message window or an agent's dialog, the right click Send Message / Info… / Remove Contact, Add to Contacts / Remove from List, or Open / Info… / Add Agent…."
     source: file://contacts.lua
     method: main
@@ -416,23 +416,23 @@ entries:
       - process
       - registry
     imports:
-      app: windows.shell.sdk:app
-      desktop: windows.tui_desktop.desktop:window_api
+      app: chicago.shell.sdk:app
+      desktop: chicago.tui_desktop.desktop:window_api
       roster: kickside.agents.traits:roster_list
       component: kickside.component:component
-      agents: windows.aicq:agents
-      people: windows.aicq:people
-      aicq: windows.aicq:aicq
+      agents: chicago.aicq:agents
+      people: chicago.aicq:people
+      aicq: chicago.aicq:aicq
     security:
-      policies: [windows.aicq:window_scope, windows.aicq:window_db, windows.aicq:db_name]
+      policies: [chicago.aicq:window_scope, chicago.aicq:window_db, chicago.aicq:db_name]
 
-  # windows.aicq:message
+  # chicago.aicq:message
   - name: message
     kind: process.lua
     meta:
       type: tui_desktop.window
       title: Message
-      image: windows.aicq:images/message
+      image: chicago.aicq:images/message
       icon: "✉"
       group: Programs
       # Opened from the contact list with the person in the argument; on its
@@ -442,27 +442,27 @@ entries:
       height: 22
       window_type: app
       resizable: true
-      pixel_render: windows.shell.sdk:render
-      pixel_state: windows.aicq:message
+      pixel_render: chicago.shell.sdk:render
+      pixel_state: chicago.aicq:message
       comment: "aICQ's message window — the history with one person above, the input below, Send (Ctrl+Enter) and Close; reloads on the messenger's ping."
     source: file://message.lua
     method: main
     modules:
       - process
     imports:
-      app: windows.shell.sdk:app
-      people: windows.aicq:people
-      aicq: windows.aicq:aicq
+      app: chicago.shell.sdk:app
+      people: chicago.aicq:people
+      aicq: chicago.aicq:aicq
     security:
-      policies: [windows.aicq:window_scope, windows.aicq:window_db, windows.aicq:db_name]
+      policies: [chicago.aicq:window_scope, chicago.aicq:window_db, chicago.aicq:db_name]
 
-  # windows.aicq:add_contact
+  # chicago.aicq:add_contact
   - name: add_contact
     kind: process.lua
     meta:
       type: tui_desktop.window
       title: Add Contact
-      image: windows.aicq:images/aicq
+      image: chicago.aicq:images/aicq
       icon: "+"
       group: Programs
       # Opened from the contact list with its pid in the argument: the news of
@@ -472,27 +472,27 @@ entries:
       height: 20
       window_type: dialog
       resizable: false
-      pixel_render: windows.shell.sdk:render
-      pixel_state: windows.aicq:add_contact
+      pixel_render: chicago.shell.sdk:render
+      pixel_state: chicago.aicq:add_contact
       comment: "aICQ's Add Contact — find a person by an e-mail, a name or a UIN and add them to your contact list."
     source: file://add_contact.lua
     method: main
     modules:
       - process
     imports:
-      app: windows.shell.sdk:app
-      people: windows.aicq:people
-      aicq: windows.aicq:aicq
+      app: chicago.shell.sdk:app
+      people: chicago.aicq:people
+      aicq: chicago.aicq:aicq
     security:
-      policies: [windows.aicq:window_scope, windows.aicq:window_db, windows.aicq:db_name]
+      policies: [chicago.aicq:window_scope, chicago.aicq:window_db, chicago.aicq:db_name]
 
-  # windows.aicq:dialog
+  # chicago.aicq:dialog
   - name: dialog
     kind: process.lua
     meta:
       type: tui_desktop.window
       title: Chat
-      image: windows.aicq:images/chat
+      image: chicago.aicq:images/chat
       icon: "✉"
       group: Programs
       # Opened from the contact list with the agent in the argument; on its own
@@ -502,8 +502,8 @@ entries:
       height: 26
       window_type: app
       resizable: true
-      pixel_render: windows.shell.sdk:render
-      pixel_state: windows.aicq:dialog
+      pixel_render: chicago.shell.sdk:render
+      pixel_state: chicago.aicq:dialog
       comment: "The dialog with an agent — the log of turns and the input line; the answer streams in from the stock session."
     source: file://dialog.lua
     method: main
@@ -514,15 +514,15 @@ entries:
       - security
       - uuid
     imports:
-      app: windows.shell.sdk:app
-      desktop: windows.tui_desktop.desktop:window_api
-      text: windows.tui_desktop.desktop:text
+      app: chicago.shell.sdk:app
+      desktop: chicago.tui_desktop.desktop:window_api
+      text: chicago.tui_desktop.desktop:text
       session_service: wippy.session:service
       session_consts: wippy.session:consts
     security:
-      policies: [windows.aicq:window_scope]
+      policies: [chicago.aicq:window_scope]
 
-  # windows.aicq:agents
+  # chicago.aicq:agents
   #
   # The "Add Agent" data layer: the libraries of the web page "Agents" under
   # the logged-on person's actor, with its own check of their handlers' gates
@@ -542,7 +542,7 @@ entries:
       catalog: kickside.models.catalog:model_catalog
       agent_ref: kickside.agents:agent_ref
 
-  # windows.aicq:new_agent_scope
+  # chicago.aicq:new_agent_scope
   #
   # Exactly what the dialog needs beyond the person's group: talking to the
   # compositor (the process context, looking up its name, sending the frame)
@@ -562,13 +562,13 @@ entries:
       resources: "*"
       effect: allow
 
-  # windows.aicq:new_agent
+  # chicago.aicq:new_agent
   - name: new_agent
     kind: process.lua
     meta:
       type: tui_desktop.window
       title: Add Agent
-      image: windows.aicq:images/aicq
+      image: chicago.aicq:images/aicq
       icon: "+"
       group: Programs
       # Opened from the contact list with its pid in the argument: the news of
@@ -578,14 +578,14 @@ entries:
       height: 22
       window_type: dialog
       resizable: false
-      pixel_render: windows.shell.sdk:render
-      pixel_state: windows.aicq:new_agent
+      pixel_render: chicago.shell.sdk:render
+      pixel_state: chicago.aicq:new_agent
       comment: "A new agent from aICQ — name, description, model, system prompt; created with the library of the web page 'Agents', and the contact list is told."
     source: file://add_agent.lua
     method: main
     imports:
-      app: windows.shell.sdk:app
-      editor: windows.shell.sdk:editor
-      agents: windows.aicq:agents
+      app: chicago.shell.sdk:app
+      editor: chicago.shell.sdk:editor
+      agents: chicago.aicq:agents
     security:
-      policies: [windows.aicq:new_agent_scope]
+      policies: [chicago.aicq:new_agent_scope]
