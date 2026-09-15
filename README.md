@@ -1,6 +1,6 @@
 # chicago/aicq
 
-aICQ for the Windows 95 shell (`chicago/shell`), in the manner of ICQ:
+aICQ for the Chicago desktop (`chicago/shell`), in the manner of ICQ:
 
 - one **contact list** with two groups that never mix — **People** and
   **Agents**, each headed `People (2/7)` (online / total), online first, the

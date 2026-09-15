@@ -37,7 +37,7 @@ local people = require("people")
 local log = logger:named("chicago.aicq.presence")
 
 local TICK = tostring(aicq.TICK_S) .. "s"
--- The desktop families, from their owners: the Windows 95 shell's and the base's own.
+-- The desktop families, from their owners: the Chicago shell's and the base's own.
 local FAMILIES = {control.SERVICE_NAME, desktop.DEFAULT_SERVICE}
 -- The compositor's command that names the person logged on.
 local LIST = "desktop.list"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draw aICQ's pictures — assets/images/{32,16}/<name>.png.
 
-The image pack `chicago.aicq:images` of the Windows 95 shell (the contract is
+The image pack `chicago.aicq:images` of the Chicago shell (the contract is
 ../windows-module/docs/icons.md, "Image packs of other modules"): the shell
 finds the pack in the registry when a picture is asked for, so a redrawn file
 shows within seconds, without a restart. Own pixel art in the Windows 95

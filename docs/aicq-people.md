@@ -2,7 +2,7 @@
 
 **Status:** proposed, 2026-09-15. Owner's request: "aICQ has agents; add
 ordinary users to it." With the `terminal.ssh` host every SSH connection
-gets its own Windows 95 desktop under the person who logged on, so several
+gets its own Chicago desktop under the person who logged on, so several
 people can be on the stand at once. aICQ becomes what ICQ was: a list of
 people, who is online, messages between them — with the agents staying in
 the same list.

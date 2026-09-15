@@ -77,7 +77,7 @@ entries:
     version: "*"
     kind: ns.dependency
     meta:
-      comment: "The Windows 95 shell the module runs in; from ../../windows-module."
+      comment: "The Chicago shell the module runs in; from ../../windows-module."
     component: "chicago/shell"
     parameters:
       - name: chicago.shell:api_router

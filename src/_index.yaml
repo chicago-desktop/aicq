@@ -1,7 +1,7 @@
 version: "1.0"
 namespace: chicago.aicq
 
-# aICQ for the Windows 95 shell — the contact list of people and agents, the
+# aICQ for the Chicago shell — the contact list of people and agents, the
 # message window between people and the dialog with an agent, in the manner
 # of ICQ (docs/aicq-people.md).
 #
@@ -26,7 +26,7 @@ entries:
     kind: ns.definition
     meta:
       title: aICQ
-      description: aICQ for the Windows 95 shell — people and agents in one ICQ-style contact list, messages between people, the dialog with an agent and the tray item next to the clock.
+      description: aICQ for the Chicago desktop — people and agents in one ICQ-style contact list, messages between people, the dialog with an agent and the tray item next to the clock.
 
   # ─── What the module takes from others ────────────────────────────────
   - version: "*"
@@ -42,7 +42,7 @@ entries:
     name: dep.chicago.shell
     kind: ns.dependency
     meta:
-      comment: "The Windows 95 shell — the window SDK and the desktops whose tray gets aICQ's item."
+      comment: "The Chicago shell — the window SDK and the desktops whose tray gets aICQ's item."
     component: chicago/shell
 
   # The base: the window API (open a window, list the desktops, the tray
@@ -139,7 +139,7 @@ entries:
     kind: fs.directory
     meta:
       type: chicago.images
-      comment: "aICQ's pictures — an image pack of the Windows 95 shell, own pixel art."
+      comment: "aICQ's pictures — an image pack of the Chicago shell, own pixel art."
     auto_init: false
     base: module
     directory: ./assets/images
