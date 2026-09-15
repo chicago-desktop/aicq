@@ -1,0 +1,3 @@
+organization: windows
+module: aicq-harness
+description: Standalone runnable harness that boots windows/aicq with the shell, the base and stand-ins of the platform, and runs its *_test.lua suites.

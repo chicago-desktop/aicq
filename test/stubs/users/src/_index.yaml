@@ -1,0 +1,10 @@
+version: "1.0"
+namespace: kickside.users
+
+# Harness stand-in for kickside/users: only the directory adapter aICQ's
+# people_test calls, over a users table of the harness. See directory/.
+entries:
+  - name: definition
+    kind: ns.definition
+    meta:
+      title: Users (harness stand-in)

@@ -1,0 +1,14 @@
+version: "1.0"
+namespace: kickside.component
+
+entries:
+  - name: definition
+    kind: ns.definition
+    meta:
+      title: Components (harness stand-in)
+
+  - name: component
+    kind: library.lua
+    meta:
+      comment: "Harness stand-in for the component library — ACCESS and a get_context that refuses."
+    source: file://component.lua

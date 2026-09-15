@@ -1,0 +1,9 @@
+version: "1.0"
+namespace: kickside.agents.traits
+
+entries:
+  - name: roster_list
+    kind: library.lua
+    meta:
+      comment: "Harness stand-in for the agent roster — two reachable agents."
+    source: file://roster_list.lua

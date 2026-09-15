@@ -1,0 +1,8 @@
+version: "1.0"
+namespace: kickside.models
+
+entries:
+  - name: definition
+    kind: ns.definition
+    meta:
+      title: Models (harness stand-in)

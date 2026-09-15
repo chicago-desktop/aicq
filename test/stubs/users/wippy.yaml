@@ -1,0 +1,3 @@
+organization: kickside
+module: users
+description: Harness stand-in for kickside/users — the users directory adapter over a users table the suites fill. Not the real module; replaced in test/.wippy.yaml.

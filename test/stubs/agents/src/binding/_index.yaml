@@ -1,0 +1,9 @@
+version: "1.0"
+namespace: kickside.agents.binding
+
+entries:
+  - name: user_agents_func
+    kind: library.lua
+    meta:
+      comment: "Harness stand-in for creating a person's agent — refuses, with the reason."
+    source: file://user_agents_func.lua

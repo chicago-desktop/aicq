@@ -1,0 +1,3 @@
+organization: kickside
+module: agents
+description: Harness stand-in for kickside/agents — a roster of two reachable agents, the agent reference, and a create that refuses. Not the real module; replaced in test/.wippy.yaml.

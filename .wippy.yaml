@@ -1,0 +1,12 @@
+version: "1.0"
+
+# The shell and the base are not published to the Hub yet, so they are taken
+# from the neighbouring working copies. Removal condition: as soon as they are
+# published, remove these replacements and keep resolution by the versions in
+# wippy.lock — otherwise the module builds only on a machine that has the
+# directories right next to it. The platform (kickside/*, wippy/session) is
+# the Hub's, at the versions in wippy.lock.
+workspace:
+  replacements:
+    windows/shell: ../windows-module
+    windows/tui-desktop: ../kickside-module

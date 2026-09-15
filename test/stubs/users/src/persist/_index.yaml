@@ -1,0 +1,12 @@
+version: "1.0"
+namespace: kickside.users.persist
+
+# The users module's persistence, stood in by a table of the harness database
+# (harness_users) that people_test creates and fills.
+entries:
+  - name: user_repo
+    kind: library.lua
+    meta:
+      comment: "Harness stand-in for the users repository — list (the newest first, 50 without options) and get, over harness_users."
+    source: file://user_repo.lua
+    modules: [sql]

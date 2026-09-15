@@ -1,0 +1,20 @@
+version: "1.0"
+namespace: wippy.session
+
+entries:
+  - name: definition
+    kind: ns.definition
+    meta:
+      title: Sessions (harness stand-in)
+
+  - name: consts
+    kind: library.lua
+    meta:
+      comment: "Harness stand-in for the session constants — the ones the agent dialog reads, with wippy/session 0.4.3's values."
+    source: file://consts.lua
+
+  - name: service
+    kind: library.lua
+    meta:
+      comment: "Harness stand-in for the session service — ensure refuses, with the reason."
+    source: file://service.lua

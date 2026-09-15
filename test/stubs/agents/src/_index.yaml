@@ -1,0 +1,15 @@
+version: "1.0"
+namespace: kickside.agents
+
+# Harness stand-in for kickside/agents: only the three libraries aICQ imports.
+entries:
+  - name: definition
+    kind: ns.definition
+    meta:
+      title: Agents (harness stand-in)
+
+  - name: agent_ref
+    kind: library.lua
+    meta:
+      comment: "Harness stand-in for the agent reference — user_agent:<component_id>."
+    source: file://agent_ref.lua

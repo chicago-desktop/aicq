@@ -1,0 +1,11 @@
+version: "1.0"
+namespace: kickside.users.directory
+
+entries:
+  - name: directory_lib
+    kind: library.lua
+    meta:
+      comment: "Harness stand-in for the users directory adapter — search, resolve and exists over the 50 newest accounts, as kickside/users 0.1.41 behaves."
+    source: file://directory_lib.lua
+    imports:
+      user_repo: kickside.users.persist:user_repo
