@@ -5,15 +5,15 @@ modules:
     - name: chicago/aicq
       version: 0.0.0
     - name: chicago/shell
-      version: 0.2.0
+      version: 0.2.7
       source: github.com/chicago-desktop/shell
-      commit: 3903352d94c43c6b1eb7eb846c5288fe2a18a2c7
-      local_hash: sha256-tree-v1:f6c370a42752d4e2a85d7100d228ba9adb67f7d40da4a39dee55cb791aa3a6c6
+      commit: 5011e03b6b42efdb068c6fa2ca84c43004511af1
+      local_hash: sha256-tree-v1:099ee99a808417e05fdad0a608292f888059b8c16c13d03907d36458165bf24a
     - name: chicago/tui-desktop
-      version: 0.2.0
+      version: 0.2.1
       source: github.com/chicago-desktop/tui-desktop
-      commit: 4a946604767059b248b3fed724c308a5f09c50fc
-      local_hash: sha256-tree-v1:5d2265ae39d08badb662b04a505c6f35d516d8c2093877b1806dc3a59e7daef4
+      commit: 9d41b3ca94e6a0c123006622702ed67b96d51e24
+      local_hash: sha256-tree-v1:8ffccaed6cd131ef97f00d76c0652dd62a71374bbb758484dae9ca7aea0c23f9
     - name: kickside/agents
       version: 0.1.41
     - name: kickside/component

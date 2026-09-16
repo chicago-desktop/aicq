@@ -196,6 +196,75 @@ function aicq.pick(agents: any, why: any, report: any, now: any, people: any?): 
     return aicq.presence(agents, why, people)
 end
 
+-- The arrival of a message ------------------------------------------------
+--
+-- What the messenger shows the recipient of a just-stored message: a balloon
+-- tip by the notification area (the shell's chicago.shell.sdk:notify) and a
+-- flash of their aICQ windows. Decided here, as pure data, so the harness
+-- checks the balloon without a desktop.
+--
+-- Nothing is kept for a person with no desktop open: the shell has no
+-- offline delivery (the owner's rule), and the message waits in the history
+-- where it already lies.
+
+aicq.BALLOON_TIMEOUT = 10
+-- The balloon is at most 40 cells wide and four lines high: eighty
+-- characters fill it, and what is longer ends in an ellipsis of our own
+-- rather than in a line the theme cuts.
+aicq.PREVIEW_MAX = 80
+-- The title of a balloon whose sender's name could not be read. An id is
+-- not a name, and would tell the person nothing.
+aicq.NEW_MESSAGE = "New message"
+aicq.NO_TEXT = "You have a new message."
+-- The windows a flash asks attention of, in this order: the conversation
+-- itself while one is open, else the contact list.
+aicq.FLASH_ENTRIES = {aicq.MESSAGE, aicq.CONTACTS}
+
+-- preview(text) -> the message on one line: trimmed, every run of blanks a
+-- single space, at most PREVIEW_MAX characters and an ellipsis after them.
+-- Characters, not bytes: a cut inside a UTF-8 sequence prints a broken rune.
+function aicq.preview(text: any): string
+    local one = trim((string.gsub(tostring(text or ""), "%s+", " ")))
+    local count, cut = 0, nil
+    for index = 1, #one do
+        local byte = string.byte(one, index)
+        -- A lead byte or an ASCII one: a character starts here.
+        if byte < 128 or byte >= 192 then
+            count = count + 1
+            if count > aicq.PREVIEW_MAX then
+                cut = index - 1
+                break
+            end
+        end
+    end
+    if cut == nil then return one end
+    return trim(string.sub(one, 1, cut)) .. "…"
+end
+
+-- arrival(row, name) -> the balloon for the recipient | nil when there is
+-- none to show: a message whose two ends are one person, or a row without
+-- them. `row` is the stored row (`people.ends`): {from_id, to_id, body}.
+-- `name` is the sender's display name, nil when it could not be read.
+--
+-- A click on the balloon's body opens the conversation with the sender —
+-- the message window with its arguments ("<id>\n<name>"), the same ones the
+-- contact list opens it with. The tail points at aICQ's tray item, and the
+-- key is the sender's: a burst from one person replaces its own balloon
+-- instead of filling the desktop's queue (it holds eight).
+function aicq.arrival(row: any, name: any): any
+    if type(row) ~= "table" then return nil end
+    local from, to = tostring(row.from_id or ""), tostring(row.to_id or "")
+    if from == "" or to == "" or from == to then return nil end
+    local known = trim(name)
+    if known == "" then known = nil end
+    local text = aicq.preview(row.body)
+    if text == "" then text = aicq.NO_TEXT end
+    return {user = to, title = known or aicq.NEW_MESSAGE, text = text,
+        image = aicq.MESSAGE_IMAGE, anchor = aicq.TRAY_KEY,
+        entry = aicq.MESSAGE, args = from .. "\n" .. (known or ""),
+        key = "aicq:" .. from, timeout = aicq.BALLOON_TIMEOUT}
+end
+
 -- unwrap(value) -> a message's body as a table. A message arrives wrapped:
 -- the payload is userdata, and inside may be a one-element array; a field read
 -- directly would be nil without an error.

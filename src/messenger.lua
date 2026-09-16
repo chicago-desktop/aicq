@@ -17,6 +17,8 @@ local process = require("process")
 local channel = require("channel")
 local logger = require("logger")
 local people = require("people")
+local aicq = require("aicq")
+local notify = require("notify")
 
 local log = logger:named("chicago.aicq.messenger")
 
@@ -33,6 +35,42 @@ local function refresh(user_id: any)
     if not sent then log:warn("tray refresh not asked", {user_id = user_id, error = tostring(err)}) end
 end
 
+-- sender_name(user_id) -> the display name | nil. The users directory behind
+-- its gate, as a window reads it (people.name_of). This service's actor is
+-- not a person, so the gate may refuse it — the balloon then says "New
+-- message" rather than an id, and the refusal is said at debug: it is an
+-- ordinary state, not a fault.
+local function sender_name(user_id: any): any
+    local ok, found, why = pcall(people.name_of, user_id)
+    if ok and type(found) == "string" and found ~= "" then return found end
+    log:debug("the sender's name was not read",
+        {user_id = tostring(user_id), reason = tostring(ok and why or found)})
+    return nil
+end
+
+-- announce(row) — what the recipient sees of an arriving message: a balloon
+-- tip by the notification area, its tail at aICQ's tray item and a click
+-- opening the conversation with the sender, and a flash of their aICQ
+-- windows — the conversation while one is open, else the contact list.
+--
+-- Nobody online is not a failure: the shell keeps nothing for a later logon
+-- (the owner's rule), the message waits in the history, and this is said at
+-- info, never warn. A message to oneself shows nothing (`aicq.arrival`).
+local function announce(row: any)
+    local balloon = aicq.arrival(row, sender_name(row.from_id))
+    if not balloon then return end
+    local reached, why = notify.balloon(balloon)
+    if not reached then
+        log:info("no balloon shown", {user_id = tostring(row.to_id), reason = tostring(why)})
+        return
+    end
+    for _, entry in ipairs(aicq.FLASH_ENTRIES) do
+        local flashed = notify.flash({entry = entry, user = row.to_id})
+        if flashed then return end
+    end
+    log:debug("no aICQ window to flash", {user_id = tostring(row.to_id)})
+end
+
 local function sent(body: any)
     local row, err = people.ends(body.message_id)
     if not row then
@@ -46,6 +84,10 @@ local function sent(body: any)
         if not ok then log:warn("ping not sent", {pid = pid, error = tostring(serr)}) end
     end
     refresh(row.to_id)
+    -- Last of the three, and never able to stop the other two: a window
+    -- redraws on a ping, and a notification must not delay or break that.
+    local shown, why = pcall(announce, row)
+    if not shown then log:info("the arrival was not announced", {error = tostring(why)}) end
 end
 
 local function watch(from: string, body: any)

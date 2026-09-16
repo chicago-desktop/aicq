@@ -36,6 +36,36 @@ Namespace `chicago.aicq`.
 The tray item's key is `chicago.aicq`; an item not refreshed for 180 s is
 removed by the compositor.
 
+## When a message arrives
+
+The messenger shows the **recipient** — never the sender — an arriving
+message on every desktop that person has open (the shell's notifications SDK,
+`chicago.shell.sdk:notify`, shell 0.2.7 and newer):
+
+- a **balloon tip** by the notification area: the sender's name on the title
+  line, one line of the message under it (squeezed to a single line and cut
+  at 80 characters with an ellipsis), aICQ's envelope as its picture and its
+  tail pointing at aICQ's tray item. A click on it opens the conversation
+  with that sender — the message window with the sender in its arguments; the
+  balloon goes after 10 seconds, or on its ×. A burst from one person
+  replaces its own balloon instead of queueing (its key is `aicq:<sender>`),
+  so a desktop never fills its queue of eight with one conversation;
+- a **flash** of aICQ's windows: the conversation with that person while it
+  is open, otherwise the contact list — its taskbar button and title flash
+  until the window gets the focus.
+
+**A person with no desktop open gets nothing**: the shell has no offline
+delivery, nothing is kept for a later logon, and the message simply waits in
+the history, where the envelope `aICQ (N)` and the contact list show it at
+the next logon. The messenger says so at info level, never as a warning, and
+the pings to the open windows and the tray refresh happen before the balloon
+and are not affected by it.
+
+The sender's name is read through the users directory behind its gate, the
+way the contact list reads it. Under this service's own actor the directory
+may refuse it — the balloon then says **New message** rather than a bare
+account id.
+
 ## What the application provides
 
 | Requirement | Default | What |

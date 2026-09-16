@@ -43,11 +43,14 @@ entries:
   # (chicago/shell, chicago/tui-desktop) in the lock; the range says what
   # aICQ was written against (v0.2.0 is the first tag of both), the lock
   # holds the exact one.
-  - version: ">=0.2.0"
+  # 0.2.7 is the release that brought the notifications SDK
+  # (chicago.shell.sdk:notify): the messenger shows an arriving message as a
+  # balloon tip and flashes aICQ's windows, and neither exists before it.
+  - version: ">=0.2.7"
     name: dep.chicago.shell
     kind: ns.dependency
     meta:
-      comment: "The Chicago shell — the window SDK and the desktops whose tray gets aICQ's item."
+      comment: "The Chicago shell — the window SDK, the notifications SDK and the desktops whose tray gets aICQ's item."
     component: github.com/chicago-desktop/shell
 
   # The base: the window API (open a window, list the desktops, the tray
@@ -337,10 +340,13 @@ entries:
       effect: allow
 
   # chicago.aicq:messenger
+  # The notifications SDK needs `process.send` and `process.registry`, which
+  # `messenger_scope` grants already: the balloon and the flash cost this
+  # service no right it did not have.
   - name: messenger
     kind: process.lua
     meta:
-      comment: "aICQ messenger — pings the windows watching either end of a stored message and asks the presence service to refresh the recipient's tray; stores nothing."
+      comment: "aICQ messenger — pings the windows watching either end of a stored message, asks the presence service to refresh the recipient's tray and shows them a balloon tip with a flashing aICQ window; stores nothing."
     source: file://messenger.lua
     method: main
     modules:
@@ -349,6 +355,8 @@ entries:
       - process
     imports:
       people: chicago.aicq:people
+      aicq: chicago.aicq:aicq
+      notify: chicago.shell.sdk:notify
 
   # chicago.aicq:messenger.service — its host is `process_host`'s.
   - name: messenger.service

@@ -592,14 +592,41 @@ function people.count_unread(user_id: any): (integer?, string?)
     return whole(first.n) or 0, nil
 end
 
--- ends(message_id) -> {id, from_id, to_id} of a stored message.
+-- ends(message_id) -> {id, from_id, to_id, body} of a stored message. The
+-- body comes with the two ends because the messenger shows the recipient a
+-- line of it in a balloon, and it must be the stored text, not a body's.
 function people.ends(message_id: any): (any, string?)
     if type(message_id) ~= "string" or message_id == "" then return nil, "no message id" end
-    local rows, err = read("SELECT id, from_id, to_id FROM " .. MESSAGES .. " WHERE id = $1", {message_id})
+    local rows, err = read("SELECT id, from_id, to_id, body FROM " .. MESSAGES .. " WHERE id = $1", {message_id})
     if not rows then return nil, err end
     local row: any = rows[1]
     if not row then return nil, "no message " .. message_id end
-    return {id = tostring(row.id), from_id = tostring(row.from_id), to_id = tostring(row.to_id)}, nil
+    return {id = tostring(row.id), from_id = tostring(row.from_id), to_id = tostring(row.to_id),
+        body = tostring(row.body or "")}, nil
+end
+
+-- name_of(user_id) -> the name that person is shown by | nil, reason. The
+-- road the contact list takes — the users directory behind its gate — for a
+-- caller that holds only an id: the messenger, naming the sender of a
+-- balloon. The gate refuses an actor that is not a person, and the caller
+-- then says something honest instead of an id.
+function people.name_of(user_id: any): (any, string?)
+    local id = trim(user_id)
+    if id == "" then return nil, "no account named" end
+    local denied = gate("resolve")
+    if denied then return nil, denied end
+    local answer, err = people.deps.directory("resolve", {refs = {{type = "user", id = id}}})
+    if not answer then return nil, err end
+    for _, principal in ipairs(principals_of(answer)) do
+        if tostring(principal.id or "") == id then
+            local row = row_of(principal)
+            -- Known by neither name nor e-mail: the directory answered with
+            -- the id back, which is no name at all.
+            if row.full_name == nil and row.email == nil then break end
+            return people.display_name(row), nil
+        end
+    end
+    return nil, "the users directory does not know " .. id
 end
 
 -- tally(seen, now, ttl) -> {[user_id] = desktops}: the desktops whose last

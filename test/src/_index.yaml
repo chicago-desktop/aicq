@@ -74,7 +74,7 @@ entries:
         value: app:processes
 
   - name: aicq_harness.dep.shell
-    version: ">=0.2.0"
+    version: ">=0.2.7"
     kind: ns.dependency
     meta:
       comment: "The Chicago shell the module runs in; from its GitHub repository by tag, the same source the module names."
@@ -179,6 +179,30 @@ entries:
     imports:
       test: wippy.test:test
       people: chicago.aicq:people
+      directory: kickside.users.directory:directory_lib
+      user_repo: kickside.users.persist:user_repo
+      control: chicago.shell.api:control
+    method: run
+
+  # The balloon and the flash of an arriving message: the pure decision, and
+  # the messenger itself against a stand-in desktop of the shell's family.
+  - name: notify_test
+    kind: function.lua
+    meta:
+      type: test
+      comment: "aICQ's notifications — the balloon of an arriving message (title, preview, picture, anchor, entry, args, key), the flash of aICQ's windows, nothing for the sender or for a message to oneself, and the pings and the tray refresh with no desktop open."
+      group: aICQ
+      suite: chicago_aicq
+    source: file://notify_test.lua
+    modules:
+      - channel
+      - process
+      - sql
+      - time
+    imports:
+      test: wippy.test:test
+      people: chicago.aicq:people
+      aicq: chicago.aicq:aicq
       directory: kickside.users.directory:directory_lib
       user_repo: kickside.users.persist:user_repo
       control: chicago.shell.api:control

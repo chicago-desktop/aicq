@@ -188,6 +188,21 @@ its own actor. It stores nothing; the rows are already written.
   pings the watchers of both ends with `aicq.new {from_id, to_id,
   message_id}` — the sender's other desktops show the message too — and
   sends `aicq.refresh {user_id = to_id}` to the presence service.
+  After the pings and the refresh, and only then, it shows the recipient the
+  message itself (`chicago.shell.sdk:notify`, shell 0.2.7): a balloon tip on
+  each of their desktops — the sender's name as its title, one line of the
+  stored body as its text (`aicq.preview`), aICQ's envelope as its picture,
+  the tail at the tray item `chicago.aicq`, the key `aicq:<from_id>` so a
+  burst from one person replaces its own balloon, and a click opening the
+  message window on that sender (`aicq.arrival`) — and a flash of that
+  person's aICQ windows: the conversation while one is open, else the contact
+  list. The sender is shown nothing, and a message to oneself nothing at all.
+  Nobody online is not a failure: there is no offline delivery (the owner's
+  rule), the message waits in the history, and the messenger says so at info —
+  never warn, and never in the way of the pings or the tray. The sender's name
+  comes from the users directory behind its gate (`people.name_of`); under
+  this service's actor it may be refused, and the title is then
+  "New message", never a bare id.
 - `aicq.read {user_id}` — from a window after `mark_read`; the messenger asks
   the presence service to refresh that person's tray. A forged one only
   refreshes a tray.
