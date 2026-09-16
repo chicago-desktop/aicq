@@ -199,10 +199,41 @@ its own actor. It stores nothing; the rows are already written.
   list. The sender is shown nothing, and a message to oneself nothing at all.
   Nobody online is not a failure: there is no offline delivery (the owner's
   rule), the message waits in the history, and the messenger says so at info —
-  never warn, and never in the way of the pings or the tray. The sender's name
-  comes from the users directory behind its gate (`people.name_of`); under
-  this service's actor it may be refused, and the title is then
-  "New message", never a bare id.
+  never warn, and never in the way of the pings or the tray.
+  The sender's name comes from the users directory (`people.name_of`), and
+  the service's policies grant the three things that road needs, each
+  measured under the service's own actor in the harness:
+  `chicago.aicq:messenger_directory` — `access` on
+  `kickside.users.directory:directory_resolve`, aICQ's own gate, the check a
+  window makes; `chicago.aicq:messenger_contract` — `contract.get` on
+  `kickside.contract:directory` ("not allowed to access contract" without
+  it); and `chicago.aicq:messenger_binding` — `contract.open` on
+  `kickside.users.directory:directory_binding`, the canonical implementation
+  ("not allowed to open binding" without it); and
+  `chicago.aicq:messenger_call` — `contract.call` on `resolve`, which the
+  runtime checks by the bare method name, so it is narrowed not by its own
+  resource but by the two grants before it. The service is not given
+  `contract.security`, the right to open a contract as somebody else: it
+  reads under its own actor, so `people.name_of` falls back to that context
+  instead of naming one. Without these grants every
+  balloon would read "New message"; with them the title is the name, and
+  "New message" stays the fallback for an account the directory does not
+  know. Neither `search` nor `exists` is granted to this service. The name is asked for
+  only once there is somewhere to show it: `announce` decides the target
+  first and looks for a running desktop of the shell's family before it asks
+  the directory anything. A name longer than the compositor's 64 characters
+  is cut to fit (`aicq.TITLE_MAX`) — a refused balloon would cost the flash
+  after it.
+  *What the base does today:* a click on a balloon opens its `entry` only if
+  no window of that entry is open; `raise_open` (chicago/tui-desktop) matches
+  by entry alone, so with a message window already open on someone else the
+  click raises **that** window and drops the balloon's arguments — the wrong
+  conversation. Opening the right one needs the base to match a window's
+  arguments as well as its entry, which is a change in that module and its
+  own release. The balloon's arguments also carry two fields where the
+  contact list passes three (`<id>\n<name>\n<pid>`), so a window opened from
+  a balloon tells no contact list it has read the messages: that list's
+  unread counts stand until its own minute tick.
 - `aicq.read {user_id}` — from a window after `mark_read`; the messenger asks
   the presence service to refresh that person's tray. A forged one only
   refreshes a tray.

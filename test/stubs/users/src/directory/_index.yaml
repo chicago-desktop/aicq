@@ -9,3 +9,48 @@ entries:
     source: file://directory_lib.lua
     imports:
       user_repo: kickside.users.persist:user_repo
+
+  # The contract's implementation, under the ids the real module uses: the
+  # three endpoints double as the gates aICQ checks before it reads a name
+  # (`people.GATES`), and `directory_binding` is the canonical implementation
+  # of `kickside.contract:directory` — the entry the messenger's
+  # `chicago.aicq:messenger_binding` names. Same ids here as in the
+  # application, so a grant proved in the harness is the grant that ships.
+  - name: directory_search
+    kind: function.lua
+    meta:
+      comment: "Stand-in directory search behind the contract."
+    source: file://contract_search.lua
+    method: main
+    imports:
+      directory: kickside.users.directory:directory_lib
+
+  - name: directory_resolve
+    kind: function.lua
+    meta:
+      comment: "Stand-in directory resolve — the endpoint the messenger reaches for a sender's name."
+    source: file://contract_resolve.lua
+    method: main
+    imports:
+      directory: kickside.users.directory:directory_lib
+
+  - name: directory_exists
+    kind: function.lua
+    meta:
+      comment: "Stand-in directory exists behind the contract."
+    source: file://contract_exists.lua
+    method: main
+    imports:
+      directory: kickside.users.directory:directory_lib
+
+  - name: directory_binding
+    kind: contract.binding
+    meta:
+      comment: "Canonical implementation of kickside.contract:directory, stood in over the harness adapter."
+    contracts:
+      - contract: kickside.contract:directory
+        default: true
+        methods:
+          search: kickside.users.directory:directory_search
+          resolve: kickside.users.directory:directory_resolve
+          exists: kickside.users.directory:directory_exists

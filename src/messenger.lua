@@ -19,6 +19,7 @@ local logger = require("logger")
 local people = require("people")
 local aicq = require("aicq")
 local notify = require("notify")
+local desktop = require("desktop")
 
 local log = logger:named("chicago.aicq.messenger")
 
@@ -36,10 +37,12 @@ local function refresh(user_id: any)
 end
 
 -- sender_name(user_id) -> the display name | nil. The users directory behind
--- its gate, as a window reads it (people.name_of). This service's actor is
--- not a person, so the gate may refuse it — the balloon then says "New
--- message" rather than an id, and the refusal is said at debug: it is an
--- ordinary state, not a fault.
+-- the same gate a window passes (people.name_of); this service's policy
+-- grants that one gate and nothing else of the directory
+-- (`chicago.aicq:messenger_directory` — without it every balloon would read
+-- "New message"). An account the directory does not know, or a refusal, is
+-- an ordinary state and not a fault: it is said at debug, and the title
+-- falls back to "New message" rather than a bare id.
 local function sender_name(user_id: any): any
     local ok, found, why = pcall(people.name_of, user_id)
     if ok and type(found) == "string" and found ~= "" then return found end
@@ -57,12 +60,26 @@ end
 -- (the owner's rule), the message waits in the history, and this is said at
 -- info, never warn. A message to oneself shows nothing (`aicq.arrival`).
 local function announce(row: any)
-    local balloon = aicq.arrival(row, sender_name(row.from_id))
-    if not balloon then return end
+    -- Whom it is for, first of all: a message to oneself, or a row without
+    -- two ends, shows nothing — and asks the users directory nothing either.
+    local plain = aicq.arrival(row, nil)
+    if not plain then return end
+    -- And with no desktop of the shell's family running there is nobody to
+    -- show it to: a name nobody would read is not worth a directory call.
+    -- This is a lookup in the process registry, not a question to a desktop.
+    if #desktop.desktops(notify.FAMILY) == 0 then
+        log:info("no balloon shown", {user_id = tostring(row.to_id), reason = notify.NOBODY})
+        return
+    end
+    local balloon = aicq.arrival(row, sender_name(row.from_id)) or plain
     local reached, why = notify.balloon(balloon)
     if not reached then
         log:info("no balloon shown", {user_id = tostring(row.to_id), reason = tostring(why)})
-        return
+        -- Nobody to show it to means that person has no desktop open: there
+        -- is nothing to flash either. Any other refusal is the balloon's
+        -- alone — a full queue, a field the desktop did not take — and an
+        -- open window may still ask for attention.
+        if tostring(why) == notify.NOBODY then return end
     end
     for _, entry in ipairs(aicq.FLASH_ENTRIES) do
         local flashed = notify.flash({entry = entry, user = row.to_id})

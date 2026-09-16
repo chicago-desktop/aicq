@@ -211,7 +211,16 @@ aicq.BALLOON_TIMEOUT = 10
 -- The balloon is at most 40 cells wide and four lines high: eighty
 -- characters fill it, and what is longer ends in an ellipsis of our own
 -- rather than in a line the theme cuts.
-aicq.PREVIEW_MAX = 80
+-- Both limits are locals first and fields after: to the typechecker a field
+-- of this table is anything the table ever holds, and `shorten` takes an
+-- integer. The fields stay because the harness and the docs name them.
+local PREVIEW_MAX = 80
+-- The compositor refuses a balloon whose title is longer than 64 characters
+-- (`BALLOON_TITLE` in the base), and a refused balloon would cost the flash
+-- with it: a long name is cut here instead, the ellipsis counted in.
+local TITLE_MAX = 64
+aicq.PREVIEW_MAX = PREVIEW_MAX
+aicq.TITLE_MAX = TITLE_MAX
 -- The title of a balloon whose sender's name could not be read. An id is
 -- not a name, and would tell the person nothing.
 aicq.NEW_MESSAGE = "New message"
@@ -220,25 +229,38 @@ aicq.NO_TEXT = "You have a new message."
 -- itself while one is open, else the contact list.
 aicq.FLASH_ENTRIES = {aicq.MESSAGE, aicq.CONTACTS}
 
--- preview(text) -> the message on one line: trimmed, every run of blanks a
--- single space, at most PREVIEW_MAX characters and an ellipsis after them.
--- Characters, not bytes: a cut inside a UTF-8 sequence prints a broken rune.
-function aicq.preview(text: any): string
-    local one = trim((string.gsub(tostring(text or ""), "%s+", " ")))
-    local count, cut = 0, nil
-    for index = 1, #one do
-        local byte = string.byte(one, index)
+-- runes(text) -> how many characters: UTF-8 lead bytes, not bytes — what the
+-- compositor counts its limits in.
+local function runes(text: string): integer
+    local _, count = string.gsub(text, "[^\128-\191]", "")
+    return math.tointeger(count) or 0
+end
+
+-- shorten(text, max) -> the text whole while it is at most `max` characters,
+-- else its first max-1 characters and an ellipsis: the answer never exceeds
+-- `max`, the ellipsis counted in. Characters, not bytes: a cut inside a
+-- UTF-8 sequence prints a broken rune.
+local function shorten(text: string, max: integer): string
+    if runes(text) <= max then return text end
+    local count, cut = 0, #text
+    for index = 1, #text do
+        local byte = string.byte(text, index)
         -- A lead byte or an ASCII one: a character starts here.
         if byte < 128 or byte >= 192 then
             count = count + 1
-            if count > aicq.PREVIEW_MAX then
+            if count > max - 1 then
                 cut = index - 1
                 break
             end
         end
     end
-    if cut == nil then return one end
-    return trim(string.sub(one, 1, cut)) .. "…"
+    return trim(string.sub(text, 1, cut)) .. "…"
+end
+
+-- preview(text) -> the message on one line: trimmed, every run of blanks a
+-- single space, at most PREVIEW_MAX characters and an ellipsis after them.
+function aicq.preview(text: any): string
+    return shorten(trim((string.gsub(tostring(text or ""), "%s+", " "))), PREVIEW_MAX)
 end
 
 -- arrival(row, name) -> the balloon for the recipient | nil when there is
@@ -255,8 +277,10 @@ function aicq.arrival(row: any, name: any): any
     if type(row) ~= "table" then return nil end
     local from, to = tostring(row.from_id or ""), tostring(row.to_id or "")
     if from == "" or to == "" or from == to then return nil end
-    local known = trim(name)
-    if known == "" then known = nil end
+    local known: any = trim(name)
+    -- A name longer than the compositor takes would have the whole balloon
+    -- refused, and the flash after it lost: it is cut to fit instead.
+    if known == "" then known = nil else known = shorten(known, TITLE_MAX) end
     local text = aicq.preview(row.body)
     if text == "" then text = aicq.NO_TEXT end
     return {user = to, title = known or aicq.NEW_MESSAGE, text = text,

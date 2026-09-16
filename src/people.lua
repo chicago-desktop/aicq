@@ -257,12 +257,28 @@ end
 
 -- The users directory under the caller's actor and scope, the way the
 -- profile window opens its contract.
+--
+-- Naming the actor explicitly is itself a right: `with_actor` asks for
+-- `contract.security` on `security` — "use contracts with a custom security
+-- context" — and answers nil when it is refused. A window's scope carries
+-- it; a service's (the messenger, reading a sender's name) does not, and
+-- must not: that right is the right to open a contract as somebody else.
+-- Such a caller opens under its own ambient context instead — the same
+-- identity it would have named, never a wider one. Chaining straight off
+-- `with_actor` used to raise here ("index a nil with 'with_scope'") and cost
+-- the caller the whole answer.
 local function directory_call(method: string, args: any): (any, string?)
     local def, derr = contract.get(people.DIRECTORY)
     if derr or not def then return nil, "the users directory is unavailable: " .. tostring(derr) end
     local opener: any = def
     local actor, scope = security.actor(), security.scope()
-    if actor and scope then opener = opener:with_actor(actor):with_scope(scope) end
+    if actor and scope then
+        local named: any = opener:with_actor(actor)
+        if named ~= nil then
+            local scoped: any = named:with_scope(scope)
+            if scoped ~= nil then opener = scoped end
+        end
+    end
     local instance: any, oerr = opener:open()
     if oerr or not instance then return nil, "the users directory did not open: " .. tostring(oerr) end
     local result, cerr = instance[method](instance, args)

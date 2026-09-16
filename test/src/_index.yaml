@@ -112,6 +112,21 @@ entries:
       - name: wippy.bootloader:env_storage
         value: app:env_storage
 
+  # ─── A caller under a scope of the case's choosing ─────────────────────
+  # The messenger's rights are proved without the messenger: this process is
+  # spawned with its actor and its very policies, and answers with the name
+  # or with the refusal, so a missing grant is named rather than guessed at.
+  - name: name_caller
+    kind: process.lua
+    meta:
+      comment: "Calls people.name_of under the actor and scope its spawner gave it; its result is the name or the reason it was refused."
+    source: file://name_caller.lua
+    method: main
+    modules:
+      - json
+    imports:
+      people: chicago.aicq:people
+
   # ─── The module's suites ───────────────────────────────────────────────
   # They live here, in the harness, and not in the module's src: the module's
   # `exclude_meta: type: [test]` drops test entries from a module loaded as a
@@ -196,7 +211,9 @@ entries:
     source: file://notify_test.lua
     modules:
       - channel
+      - json
       - process
+      - security
       - sql
       - time
     imports:

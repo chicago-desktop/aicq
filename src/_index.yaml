@@ -328,6 +328,75 @@ entries:
       resources: "*"
       effect: allow
 
+  # The sender's name on a balloon comes from the users directory, and two
+  # different checks stand in the way of it. Both were measured under this
+  # service's own actor in the harness (test/src/notify_test.lua, "the
+  # messenger's own policies reach the name"), and each gets its own grant so
+  # neither is wider than the check it answers:
+  #
+  #   * aICQ's own gate — `access` on the directory's resolve endpoint, the
+  #     same check a window makes before it reads a name (`people.name_of`);
+  #   * `contract.get` on the contract the library opens — the runtime's own
+  #     check (`security.IsAllowed(…, "contract.get", contractID)`); without
+  #     it the answer is "not allowed to access contract";
+  #   * `contract.open` on the implementation behind it — checked again when
+  #     the binding is opened ("not allowed to open binding: …");
+  #   * `contract.call` on the method — checked once more on the call, and
+  #     the runtime names the bare method ("resolve"), not the contract. That
+  #     resource cannot be narrowed further; what narrows it is the two
+  #     grants above, which let this service open no other contract.
+  #
+  # Each check gets its own grant, so none is wider than what it answers.
+  # `search` and `exists` stay shut to this service, which resolves one id it
+  # has already read from a stored row; and it never asks to open a contract
+  # as somebody else (`contract.security`), so it reads under its own actor.
+  - name: messenger_directory
+    kind: security.policy
+    meta:
+      comment: "aICQ messenger passes the users directory's resolve gate — the same check a window makes; not search, not exists."
+    policy:
+      actions:
+        - access
+      resources:
+        - kickside.users.directory:directory_resolve
+      effect: allow
+
+  - name: messenger_contract
+    kind: security.policy
+    meta:
+      comment: "aICQ messenger may open the one contract it uses — the users directory behind kickside.contract:directory."
+    policy:
+      actions:
+        - contract.get
+      resources:
+        - kickside.contract:directory
+      effect: allow
+
+  - name: messenger_binding
+    kind: security.policy
+    meta:
+      comment: "aICQ messenger may open that contract's canonical implementation — the users directory binding, and no other."
+    policy:
+      actions:
+        - contract.open
+      resources:
+        - kickside.users.directory:directory_binding
+      effect: allow
+
+  # The runtime checks the bare method name here, so the resource is
+  # `resolve`; `search` and `exists` are still refused, and no other contract
+  # can be opened by this service anyway.
+  - name: messenger_call
+    kind: security.policy
+    meta:
+      comment: "aICQ messenger may call the directory's resolve method — one method, on the only contract it can open."
+    policy:
+      actions:
+        - contract.call
+      resources:
+        - resolve
+      effect: allow
+
   # The resource is the application's database, filled in by `target_db`.
   - name: messenger_db
     kind: security.policy
@@ -341,8 +410,12 @@ entries:
 
   # chicago.aicq:messenger
   # The notifications SDK needs `process.send` and `process.registry`, which
-  # `messenger_scope` grants already: the balloon and the flash cost this
-  # service no right it did not have.
+  # `messenger_scope` grants already: the balloon and the flash themselves
+  # cost this service no new right. What it did gain is the road to the
+  # sender's name — the directory's resolve gate (`messenger_directory`), the
+  # right to read that one contract (`messenger_contract`), to open its
+  # implementation (`messenger_binding`) and to call resolve on it
+  # (`messenger_call`).
   - name: messenger
     kind: process.lua
     meta:
@@ -357,6 +430,7 @@ entries:
       people: chicago.aicq:people
       aicq: chicago.aicq:aicq
       notify: chicago.shell.sdk:notify
+      desktop: chicago.tui_desktop.desktop:window_api
 
   # chicago.aicq:messenger.service — its host is `process_host`'s.
   - name: messenger.service
@@ -376,6 +450,10 @@ entries:
         policies:
           - chicago.aicq:messenger_scope
           - chicago.aicq:messenger_db
+          - chicago.aicq:messenger_directory
+          - chicago.aicq:messenger_contract
+          - chicago.aicq:messenger_binding
+          - chicago.aicq:messenger_call
           - chicago.aicq:db_name
 
   # ─── The windows ──────────────────────────────────────────────────────

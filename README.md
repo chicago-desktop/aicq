@@ -46,8 +46,14 @@ message on every desktop that person has open (the shell's notifications SDK,
   line, one line of the message under it (squeezed to a single line and cut
   at 80 characters with an ellipsis), aICQ's envelope as its picture and its
   tail pointing at aICQ's tray item. A click on it opens the conversation
-  with that sender — the message window with the sender in its arguments; the
-  balloon goes after 10 seconds, or on its ×. A burst from one person
+  with that sender — the message window with the sender in its arguments;
+  the balloon goes after 10 seconds, or on its ×. **One caveat as the base
+  stands today:** the compositor raises an already open window of that entry
+  and drops the balloon's arguments (`raise_open` in `chicago/tui-desktop`
+  matches by entry alone), so with a message window already open on someone
+  else the click brings that conversation forward, not the sender's. Opening
+  the right one needs the base to match a window's arguments too — a change
+  in that module and its own release. A burst from one person
   replaces its own balloon instead of queueing (its key is `aicq:<sender>`),
   so a desktop never fills its queue of eight with one conversation;
 - a **flash** of aICQ's windows: the conversation with that person while it
@@ -61,10 +67,27 @@ the next logon. The messenger says so at info level, never as a warning, and
 the pings to the open windows and the tray refresh happen before the balloon
 and are not affected by it.
 
-The sender's name is read through the users directory behind its gate, the
-way the contact list reads it. Under this service's own actor the directory
-may refuse it — the balloon then says **New message** rather than a bare
-account id.
+The balloon's title is the sender's **display name** when the users directory
+answers: the messenger reads it behind the same gate the contact list passes,
+and its policies grant exactly what that road needs and nothing more — one
+grant per check, each measured under the service's own actor in the harness:
+
+| Policy | Grant | The check it answers |
+|---|---|---|
+| `messenger_directory` | `access` on `kickside.users.directory:directory_resolve` | aICQ's own gate, the one a window passes |
+| `messenger_contract` | `contract.get` on `kickside.contract:directory` | the runtime's, when the contract is read |
+| `messenger_binding` | `contract.open` on `kickside.users.directory:directory_binding` | the runtime's, when its implementation is opened |
+| `messenger_call` | `contract.call` on `resolve` | the runtime's, when the method is called |
+
+The last resource is the bare method name — that is what the runtime checks
+on a call, and it cannot be narrowed further; what keeps it narrow is that
+this service can open no contract but the one above. Neither `search` nor
+`exists` is granted: it resolves one id it has already read from a stored
+row. Nor is `contract.security`, the right to open a contract as somebody
+else — the messenger reads the directory under its own actor. When the directory does not answer — an account it does not know, or a
+refusal — the title is **New message**, never a bare account id. A name
+longer than the compositor takes (64 characters) is cut to fit rather than
+losing the balloon and the flash with it.
 
 ## What the application provides
 

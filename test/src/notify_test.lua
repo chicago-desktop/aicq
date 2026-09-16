@@ -11,10 +11,12 @@
 -- `chicago.shell.sdk:notify` looks desktops up by), says who is logged on to
 -- it, and keeps what the messenger sent it.
 --
--- The harness stands the platform in and has no users directory contract, so
--- the messenger's own `people.name_of` is refused there and the balloon says
--- "New message" — the honest fallback, checked here as such; the name itself
--- is checked on the pure half and on the library.
+-- The harness stands the platform in, the users directory as a contract among
+-- it (test/stubs/users/src/contract), so the messenger's whole road to a
+-- sender's name — its actor, its policies, `contract.get`, the directory —
+-- is walked here and not merely assumed. One case spawns a caller under the
+-- messenger's very policies, so a missing grant is named rather than guessed
+-- at; "New message" stays the fallback when the directory does not answer.
 local test = require("test")
 local people = require("people")
 local aicq = require("aicq")
@@ -25,6 +27,8 @@ local sql = require("sql")
 local process = require("process")
 local channel = require("channel")
 local time = require("time")
+local json = require("json")
+local security = require("security")
 
 local ANNA = {user_id = "u-anna", email = "anna@example.com", full_name = "Anna Karenina"}
 local BOB = {user_id = "u-bob", email = "bob@example.com", full_name = "Bob Marley"}
@@ -33,8 +37,10 @@ local EVERYONE = {ANNA, BOB, CAROL}
 
 local DESK = control.SERVICE_NAME
 
--- The road the library takes for real: the messenger must hear of a message.
-local REAL = {send = people.deps.send}
+-- The roads the library takes for real: the messenger must hear of a
+-- message, and the directory is opened as a contract (the harness stands one
+-- in — test/stubs/users/src/contract).
+local REAL = {send = people.deps.send, directory = people.deps.directory}
 
 -- Tables, not locals: an error under pcall splits upvalues in go-lua.
 local guard: any = {who = nil, granted = true}
@@ -119,6 +125,10 @@ end
 -- when none came in time. The desktop answers `desktop.list` as `user`'s with
 -- `windows` open on it, and every notification with "ok"; the presence
 -- service's questions are answered the same way and cost nothing.
+-- While this is set the desktop refuses balloons, as one holding eight does.
+-- A table, not a local: an error under pcall splits upvalues in go-lua.
+local refusing: any = {balloon = false}
+
 local function serve(user: any, windows: any, want: any, budget: string?): any
     local deadline = time.after(budget or "6s")
     while true do
@@ -135,7 +145,11 @@ local function serve(user: any, windows: any, want: any, budget: string?): any
             if picked.channel == desk.balloons then topic = "desktop.balloon"
             elseif picked.channel == desk.flashes then topic = "desktop.flash" end
             -- A tray item is pushed without a reply, as the base's `tray` does.
-            if topic ~= "desktop.tray" then reply(body, {ok = true, command = topic}) end
+            if topic == "desktop.balloon" and refusing.balloon then
+                reply(body, {ok = false, command = topic, error = "the desktop already holds 8 balloons"})
+            elseif topic ~= "desktop.tray" then
+                reply(body, {ok = true, command = topic})
+            end
             local got: any = {topic = topic, body = body}
             if want(got) then return got end
         end
@@ -163,9 +177,12 @@ local function define_tests()
             test.eq(aicq.preview("a b   c"), "a b c")
             local long = string.rep("x", aicq.PREVIEW_MAX)
             test.eq(aicq.preview(long), long, "exactly eighty characters are not cut")
-            test.eq(aicq.preview(long .. "y"), long .. "…", "the eighty-first makes an ellipsis")
+            -- The ellipsis counts against the eighty: what is shown is never
+            -- longer than the limit, here or in the title.
+            test.eq(aicq.preview(long .. "y"), string.rep("x", aicq.PREVIEW_MAX - 1) .. "…",
+                "the eighty-first makes an ellipsis, and the answer stays eighty characters")
             local cyrillic = string.rep("я", aicq.PREVIEW_MAX + 5)
-            test.eq(aicq.preview(cyrillic), string.rep("я", aicq.PREVIEW_MAX) .. "…",
+            test.eq(aicq.preview(cyrillic), string.rep("я", aicq.PREVIEW_MAX - 1) .. "…",
                 "characters, not bytes: two-byte runes are counted as one each")
             test.eq(aicq.preview(string.rep("x", aicq.PREVIEW_MAX - 1) .. "   tail"),
                 string.rep("x", aicq.PREVIEW_MAX - 1) .. "…", "no blank is left before the ellipsis")
@@ -199,6 +216,20 @@ local function define_tests()
             test.is_nil(aicq.arrival(nil, nil))
         end)
 
+        test.it("a name longer than the compositor takes is cut, not left to have the balloon refused", function()
+            local long = string.rep("Ы", aicq.TITLE_MAX + 20)
+            local title = aicq.arrival({from_id = "u-anna", to_id = "u-bob", body = "hi"}, long).title
+            local count = select(2, string.gsub(title, "[^\128-\191]", ""))
+            test.eq(count, aicq.TITLE_MAX, "exactly what the base takes, the ellipsis counted in")
+            test.eq(string.sub(title, -3), "…", "and it ends in the ellipsis")
+            local fits = string.rep("a", aicq.TITLE_MAX)
+            test.eq(aicq.arrival({from_id = "u-anna", to_id = "u-bob", body = "hi"}, fits).title, fits,
+                "a name that already fits is left whole")
+            local over = string.rep("a", aicq.TITLE_MAX + 1)
+            test.eq(aicq.arrival({from_id = "u-anna", to_id = "u-bob", body = "hi"}, over).title,
+                string.rep("a", aicq.TITLE_MAX - 1) .. "…", "one character too many is cut to fit")
+        end)
+
         test.it("name_of: the directory's name behind its gate, and a named refusal instead of an id", function()
             fresh()
             be(ANNA)
@@ -217,6 +248,60 @@ local function define_tests()
                 .. " (kickside.users.directory:directory_resolve)")
         end)
 
+        test.it("the harness's directory contract answers the library's own road", function()
+            fresh()
+            -- Not the stand-in used by the cases above: the real
+            -- `contract.get(kickside.contract:directory)` road, which is what
+            -- the messenger walks in its own process. Without this the
+            -- messenger's title could only ever be the fallback, and nothing
+            -- here would say why.
+            people.deps.directory = REAL.directory
+            be(ANNA)
+            local name, why = people.name_of(BOB.user_id)
+            test.eq(name, "Bob Marley", "the directory contract did not answer: " .. tostring(why))
+            people.deps.directory = function(method: string, args: any): (any, any)
+                return directory[method](args), nil
+            end
+        end)
+
+        test.it("the messenger's own policies reach the name: its actor, its scope, nothing borrowed", function()
+            fresh()
+            -- Exactly what the module declares for the service, and nothing
+            -- else: if this passes, the grant in src/_index.yaml is enough;
+            -- if it fails, the answer names the right that is missing.
+            local scoped: any = {}
+            for _, id in ipairs({"chicago.aicq:messenger_scope", "chicago.aicq:messenger_db",
+                "chicago.aicq:messenger_directory", "chicago.aicq:messenger_contract",
+                "chicago.aicq:messenger_binding", "chicago.aicq:messenger_call",
+                "chicago.aicq:db_name"}) do
+                local policy, perr = security.policy(id)
+                test.not_nil(policy, "policy " .. id .. ": " .. tostring(perr))
+                scoped[#scoped + 1] = policy
+            end
+            local events = assert(process.events())
+            local pid, err = process.with_context({})
+                :with_actor(security.new_actor("chicago.aicq.messenger"))
+                :with_scope(security.new_scope(scoped))
+                :spawn_monitored("app:name_caller", "app:processes", json.encode({user_id = BOB.user_id}))
+            test.not_nil(pid, "the caller did not start: " .. tostring(err))
+            -- The answer is the process's result, read from its EXIT event.
+            local got: any = {answer = nil}
+            local deadline = time.after("10s")
+            while got.answer == nil do
+                local picked = channel.select({events:case_receive(), deadline:case_receive()})
+                if picked.channel == deadline or not picked.ok then break end
+                local event: any = picked.value
+                if event.kind == process.event.EXIT and tostring(event.from) == tostring(pid) then
+                    local result: any = event.result
+                    if type(result) == "table" and type(result.value) == "table" then got.answer = result.value
+                    else got.answer = {why = "the caller ended without an answer: " .. tostring(event.error)} end
+                end
+            end
+            test.not_nil(got.answer, "the caller did not end")
+            test.eq(got.answer and got.answer.name, "Bob Marley",
+                "the messenger's policies did not reach the name: " .. tostring(got.answer and got.answer.why))
+        end)
+
         test.it("an arriving message: the recipient's desktop gets the balloon and its aICQ window flashes", function()
             fresh()
             open_desk()
@@ -226,12 +311,14 @@ local function define_tests()
             test.not_nil(balloon, "Bob's desktop got no balloon")
             local body: any = balloon and balloon.body or {}
             test.eq(body.text, "hello Bob", "the stored text on one line")
-            test.eq(body.title, aicq.NEW_MESSAGE,
-                "the harness has no users directory contract: the honest fallback, not an id")
+            -- The whole road to the name, under the messenger's own actor and
+            -- policies: the gate `chicago.aicq:messenger_directory` grants,
+            -- the directory contract, `people.display_name`.
+            test.eq(body.title, "Anna Karenina", "the sender's name, not the fallback")
             test.eq(body.image, "chicago.aicq:images/message")
             test.eq(body.anchor, aicq.TRAY_KEY)
             test.eq(body.entry, aicq.MESSAGE)
-            test.eq(body.args, "u-anna\n")
+            test.eq(body.args, "u-anna\nAnna Karenina")
             test.eq(body.key, "aicq:u-anna")
             test.eq(body.timeout, aicq.BALLOON_TIMEOUT)
             test.not_nil(id)
@@ -266,6 +353,21 @@ local function define_tests()
             test.eq(second and second.body.key, "aicq:u-anna",
                 "the same sender, the same key: the queue does not fill up")
             test.eq(second and second.body.text, "two", "and the newest text is shown")
+            close_desk()
+        end)
+
+        test.it("a refused balloon does not cost the flash: the window still asks for attention", function()
+            fresh()
+            open_desk()
+            refusing.balloon = true
+            be(ANNA)
+            assert(people.send(BOB.user_id, "the desktop's queue is full"))
+            local flash = serve(BOB, {{id = "w1", entry = aicq.MESSAGE}}, function(got: any): boolean
+                return got.topic == "desktop.flash"
+            end)
+            refusing.balloon = false
+            test.not_nil(flash, "the balloon was refused and the flash was lost with it")
+            test.eq(flash and flash.body.id, "w1")
             close_desk()
         end)
 

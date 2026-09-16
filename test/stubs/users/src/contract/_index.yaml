@@ -1,0 +1,26 @@
+version: "1.0"
+namespace: kickside.contract
+
+# Harness stand-in for the one contract aICQ opens — `kickside.contract:directory`
+# (`people.DIRECTORY`). The real definition lives in kickside/contract and its
+# canonical implementation in kickside/users; neither is booted here, so both
+# are stood in: the definition below, the implementation and its binding beside
+# the adapter in `kickside.users.directory` (../directory/_index.yaml), under
+# the ids the real module uses.
+#
+# The ids matter as much as the behaviour here: the messenger's policies name
+# them, so a grant that is right in the harness is the grant that is right in
+# the application.
+
+entries:
+  - name: directory
+    kind: contract.definition
+    meta:
+      comment: "The users directory as aICQ opens it — search, resolve and exists."
+    methods:
+      - name: search
+        description: People matching a query
+      - name: resolve
+        description: Accounts by reference
+      - name: exists
+        description: Whether an account exists
