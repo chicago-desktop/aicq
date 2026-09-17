@@ -7,7 +7,7 @@
 --   `POST /api/v1/user-agents` (`kickside.agents.api:create_user_agent`).
 --   `title` and `model` are required; the checks and their wording are the
 --   library's, and the window shows its answer as it is.
--- - Models — `kickside.models.catalog:model_catalog.get_all`, as in
+-- - Models — `kickside.models:model_catalog.get_all`, as in
 --   `GET /api/v1/models/list?capability=generate`. The "can generate" filter
 --   lives in the handler itself (`list_models.lua`), not in the library, so
 --   it is repeated here — `agents.generates`.

@@ -72,7 +72,9 @@ entries:
       comment: "The agents — the roster of reachable agents, creating a person's agent and the agent reference."
     component: kickside/agents
 
-  - version: ">=v0.1.49"
+  # 0.1.50 moved the catalog from kickside.models.catalog to kickside.models;
+  # the import below names the new place, so older releases do not satisfy it.
+  - version: ">=v0.1.50"
     name: dep.kickside.models
     kind: ns.dependency
     meta:
@@ -632,7 +634,7 @@ entries:
       - security
     imports:
       user_agents: kickside.agents.binding:user_agents_func
-      catalog: kickside.models.catalog:model_catalog
+      catalog: kickside.models:model_catalog
       agent_ref: kickside.agents:agent_ref
 
   # chicago.aicq:new_agent_scope

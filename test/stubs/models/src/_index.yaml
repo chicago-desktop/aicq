@@ -6,3 +6,9 @@ entries:
     kind: ns.definition
     meta:
       title: Models (harness stand-in)
+
+  - name: model_catalog
+    kind: library.lua
+    meta:
+      comment: "Harness stand-in for the model catalog — no models."
+    source: file://model_catalog.lua

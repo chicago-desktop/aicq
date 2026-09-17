@@ -114,7 +114,7 @@ was built against; the application binds their requirements as usual:
 | Module | From | What aICQ uses |
 |---|---|---|
 | `kickside/agents` | 0.1.41 | the roster of reachable agents, creating a person's agent, the agent reference |
-| `kickside/models` | 0.1.49 | the model catalog Add Agent offers |
+| `kickside/models` | 0.1.50 | the model catalog Add Agent offers |
 | `kickside/users` | 0.1.41 | the users directory behind `kickside.contract:directory` |
 | `kickside/component` | 0.1.36 | an agent's context for its Info sheet |
 | `wippy/session` | 0.4.3 | the stock chat session the agent dialog raises |

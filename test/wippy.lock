@@ -19,7 +19,7 @@ modules:
     - name: kickside/component
       version: 0.1.36
     - name: kickside/models
-      version: 0.1.49
+      version: 0.1.50
     - name: kickside/users
       version: 0.1.41
     - name: wippy/bootloader
