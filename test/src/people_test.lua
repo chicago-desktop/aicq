@@ -18,6 +18,8 @@ local sql = require("sql")
 local process = require("process")
 local channel = require("channel")
 local time = require("time")
+local pg = require("pg")
+local network = require("network")
 
 local ANNA = {user_id = "u-anna", email = "anna@example.com", full_name = "Anna Karenina"}
 local BOB = {user_id = "u-bob", email = "bob@example.com", full_name = "Bob Marley"}
@@ -78,6 +80,7 @@ local function fresh()
     exec("DELETE FROM chicago_aicq_contacts")
     exec("DELETE FROM chicago_aicq_messages")
     exec("DELETE FROM chicago_aicq_dismissed")
+    exec("DELETE FROM chicago_aicq_remote")
     guard.who, guard.granted, guard.asked = nil, true, {}
     told.list = {}
     people.deps.security = {
@@ -134,14 +137,14 @@ end
 
 local function define_tests()
     test.describe("aICQ people", function()
-        test.it("the migration made both tables and both indexes", function()
+        test.it("the migrations made the tables and both indexes", function()
             local found = rows("SELECT name FROM sqlite_master WHERE name LIKE 'chicago_aicq_%'"
                 .. " OR name LIKE 'idx_chicago_aicq_%' ORDER BY name")
             test.eq(names((function()
                 local out = {}
                 for _, row in ipairs(found) do out[#out + 1] = {name = row.name} end
                 return out
-            end)()), "chicago_aicq_contacts|chicago_aicq_dismissed|chicago_aicq_messages"
+            end)()), "chicago_aicq_contacts|chicago_aicq_dismissed|chicago_aicq_messages|chicago_aicq_remote"
                 .. "|idx_chicago_aicq_messages_pair|idx_chicago_aicq_messages_unread")
         end)
 
@@ -217,6 +220,179 @@ local function define_tests()
             test.is_nil(denied)
             test.eq(dwhy, "the users directory (resolve) is not granted to your account"
                 .. " (kickside.users.directory:directory_resolve)")
+        end)
+
+        test.it("other computers: Network by itself, a remote contact named as last heard, unknown kept, gone offline", function()
+            fresh()
+            be(ANNA)
+            assert(people.add(BOB.user_id))
+            local view: any = {
+                people = {
+                    {id = "net:node-b:u-zoe", node = "node-b", user_id = "u-zoe", name = "Zoe", state = "online"},
+                    {id = "net:node-b:zoe@example.com", node = "node-b", user_id = "zoe@example.com", name = "Zoe Two",
+                        state = "online"},
+                },
+                nodes = {["node-b"] = "fresh"},
+            }
+            people.deps.who = function(): (any, any, any) return {["u-bob"] = 1}, nil, view end
+            local list = assert(people.contacts())
+            local lines = {}
+            for _, one in ipairs(list) do
+                lines[#lines + 1] = table.concat({one.id, one.name, tostring(one.listed), tostring(one.network),
+                    tostring(one.state), tostring(one.online)}, ",")
+            end
+            test.eq(table.concat(lines, "|"),
+                "u-bob,Bob Marley,true,nil,nil,true"
+                .. "|net:node-b:u-zoe,Zoe (node-b),false,true,online,true"
+                .. "|net:node-b:zoe@example.com,Zoe Two (node-b),false,true,online,true",
+                "the Network rows come without adding anyone; an id with @ stays whole")
+
+            test.eq(people.add("net:node-b:u-zoe"), true)
+            test.eq(#rows("SELECT id FROM chicago_aicq_remote WHERE id = 'net:node-b:u-zoe' AND name = 'Zoe'"), 1,
+                "the name as heard is kept")
+            local function zoe(): any
+                for _, one in ipairs(assert(people.contacts())) do
+                    if one.id == "net:node-b:u-zoe" then return one end
+                end
+                return nil
+            end
+            test.eq(tostring(zoe().listed) .. "," .. tostring(zoe().network) .. "," .. zoe().state, "true,nil,online",
+                "a contact now: out of Network, into the list")
+            local copies = 0
+            for _, one in ipairs(assert(people.contacts())) do
+                if one.id == "net:node-b:u-zoe" then copies = copies + 1 end
+            end
+            test.eq(copies, 1, "a contact is not in Network as well")
+
+            -- node-b silent, still a member: unknown, the name last heard.
+            view.people = {{id = "net:node-b:u-zoe", node = "node-b", user_id = "u-zoe", name = "Zoe", state = "unknown"}}
+            view.nodes = {["node-b"] = "unknown"}
+            test.eq(zoe().state .. "," .. tostring(zoe().online) .. "," .. zoe().name, "unknown,false,Zoe (node-b)")
+
+            -- node-b gone: offline, still a contact, the remembered name.
+            view.people, view.nodes = {}, {}
+            test.eq(zoe().state .. "," .. zoe().name, "offline,Zoe (node-b)", "as in ICQ, a contact stays offline")
+            -- Presence not read at all: unknown, not offline.
+            people.deps.who = function(): (any, any, any) return nil, "not running" end
+            test.eq(zoe().state, "unknown")
+
+            -- Nobody heard of: refused.
+            people.deps.who = function(): (any, any, any) return {}, nil, {people = {}, nodes = {}} end
+            local ghost, why = people.add("net:node-b:u-ghost")
+            test.is_nil(ghost)
+            test.eq(why, "nobody by that id has been heard of on node-b")
+            test.eq(people.remove("net:node-b:u-zoe"), true)
+            test.is_nil(zoe(), "removed, and node-b is gone: nowhere")
+        end)
+
+        test.it("messages between computers: stored pending, offered until confirmed or refused, received once", function()
+            fresh()
+            be(ANNA)
+            local view: any = {people = {{id = "net:node-b:u-zoe", node = "node-b", user_id = "u-zoe", name = "Zoe",
+                state = "online"}}, nodes = {["node-b"] = "fresh"}}
+            people.deps.who = function(): (any, any, any) return {}, nil, view end
+            local id = assert(people.send("net:node-b:u-zoe", "hello Zoe"))
+            test.eq(told.list[#told.list].topic, people.SENT, "the messenger is told, as for any message")
+            local outbox = assert(people.outbox(10))
+            test.eq(#outbox, 1)
+            test.eq(outbox[1].id .. "|" .. outbox[1].to_id, id .. "|net:node-b:u-zoe")
+            local history = assert(people.history("net:node-b:u-zoe", 10))
+            test.is_true(history[1].pending == true, "pending until node-b confirms")
+            test.eq(people.delivered(id), true)
+            test.eq(people.delivered(id), false, "confirmed twice is marked once")
+            test.eq(#assert(people.outbox(10)), 0, "a confirmed message is not offered again")
+            test.is_nil(assert(people.history("net:node-b:u-zoe", 10))[1].pending)
+
+            local other = assert(people.send("net:node-b:u-zoe", "second"))
+            test.eq(people.failed(other, "no such person there"), true)
+            local last = assert(people.history("net:node-b:u-zoe", 10))[2]
+            test.eq(tostring(last.failed) .. "|" .. tostring(last.pending), "no such person there|nil")
+            test.eq(#assert(people.outbox(10)), 0, "a refused message is not offered again")
+
+            -- Nobody heard of on node-b: nothing is stored.
+            view.people = {}
+            local none, why = people.send("net:node-b:u-ghost", "hi")
+            test.is_nil(none)
+            test.eq(why, "nobody by that id has been heard of on node-b")
+
+            -- From another computer: stored once under the sender's id, the
+            -- sender's name remembered, unread for Anna.
+            local incoming = {id = "remote-1", from_id = "net:node-b:u-zoe", to_id = ANNA.user_id, body = "hi Anna",
+                name = "Zoe Z"}
+            test.eq(people.receive(incoming), true)
+            test.eq(people.receive(incoming), false, "offered again: stored once")
+            test.eq(#rows("SELECT id FROM chicago_aicq_messages WHERE id = 'remote-1'"), 1)
+            test.eq(people.remote_name("net:node-b:u-zoe"), "Zoe Z")
+            test.eq(people.count_unread(ANNA.user_id), 1)
+            local seen = assert(people.history("net:node-b:u-zoe", 10))
+            test.eq(seen[#seen].body .. "|" .. tostring(seen[#seen].pending), "hi Anna|nil", "an incoming message is not pending")
+
+            -- Someone elsewhere who wrote and is not a contact: Not in List,
+            -- with the unread count, and not in Network as well.
+            local stranger = {id = "remote-2", from_id = "net:node-b:u-yan", to_id = ANNA.user_id, body = "hey", name = "Yan"}
+            assert(people.receive(stranger))
+            view.people = {{id = "net:node-b:u-yan", node = "node-b", user_id = "u-yan", name = "Yan", state = "online"}}
+            local rows_of: any = {}
+            for _, one in ipairs(assert(people.contacts())) do
+                if one.id == "net:node-b:u-yan" then rows_of[#rows_of + 1] = one end
+            end
+            test.eq(#rows_of, 1, "one row for Yan")
+            test.eq(table.concat({tostring(rows_of[1].listed), tostring(rows_of[1].network), tostring(rows_of[1].unread),
+                rows_of[1].name}, ","), "false,nil,1,Yan (node-b)")
+            test.eq(people.dismiss("net:node-b:u-yan"), true, "dismissed without asking the users directory")
+        end)
+
+        test.it("the messenger offers a message to the other computer's messenger until answered, and believes only that node", function()
+            fresh()
+            people.deps.send = REAL.send
+            local messenger = process.registry.lookup(people.MESSENGER)
+            test.not_nil(messenger)
+            -- This test stands in for node-x's messenger.
+            local here = tostring(network.node_of(process.pid()))
+            local offers = assert(process.listen(network.DELIVER, {message = true}))
+            local answers = assert(process.listen(network.DELIVERED, {message = true}))
+            assert(process.registry.register(network.messenger_name("node-x")))
+            exec("INSERT INTO chicago_aicq_remote (id, node, name, seen_at) VALUES ('net:node-x:zed@example.com', 'node-x', 'Zed', 'x')")
+            people.deps.who = function(): (any, any, any) return {}, nil, {people = {}, nodes = {}} end
+            be(ANNA)
+            local id = assert(people.send("net:node-x:zed@example.com", "hello Zed"))
+            -- At once, not on the retry tick (every RETRY_S): a tick can
+            -- still land inside this window by chance, one run in ~7.
+            local first = receive(offers, "700ms")
+            test.not_nil(first, "offered at once")
+            test.eq(table.concat({tostring(first and first.i), tostring(first and first.f), tostring(first and first.t),
+                tostring(first and first.b)}, "|"), id .. "|u-anna|zed@example.com|hello Zed")
+            test.eq(first and first.m, "Anna Karenina", "with the sender's name")
+            local again = receive(offers, tostring(network.RETRY_S + 2) .. "s")
+            test.eq(again and again.i, id, "not answered: offered again")
+
+            -- An answer from a node the message was not for is not believed.
+            process.send(tostring(messenger), network.DELIVERED, {i = id})
+            time.sleep("300ms")
+            local row = rows("SELECT delivered_at FROM chicago_aicq_messages WHERE id = $1", {id})[1]
+            test.is_nil(row.delivered_at, "only node-x confirms a message to node-x, not " .. here)
+
+            -- A delivery from this very node is refused, not stored, and not
+            -- answered: a computer does not talk to itself in a loop.
+            process.send(tostring(messenger), network.DELIVER, {i = "loop-1", f = "u-bob", t = ANNA.user_id, b = "x"})
+            test.is_nil(receive(answers, "1s"), "no answer to itself")
+            test.eq(#rows("SELECT id FROM chicago_aicq_messages WHERE id = 'loop-1'"), 0, "and not stored")
+            process.registry.unregister(network.messenger_name("node-x"))
+            process.unlisten(offers)
+            process.unlisten(answers)
+        end)
+
+        test.it("net: is reserved: a local account whose id starts with it is not taken for a local contact", function()
+            -- A tripwire on the users module: it mints UUIDs and e-mail
+            -- addresses today. Should it ever mint net:…, this breaks here and
+            -- not in someone's contact list.
+            fresh()
+            users({ANNA, {user_id = "net:node-z:u", email = "z@example.com", full_name = "Zed"}})
+            be(ANNA)
+            people.deps.who = function(): (any, any, any) return {}, nil, {people = {}, nodes = {}} end
+            local added, why = people.add("net:node-z:u")
+            test.is_nil(added, "the users directory knows it, and still it is not added as local")
+            test.eq(why, "nobody by that id has been heard of on node-z")
         end)
 
         test.it("Not in List: a read message keeps the sender; newest conversation first; last_at either way", function()
@@ -557,6 +733,56 @@ local function define_tests()
             process.registry.unregister(DESK)
             process.unlisten(lists)
             process.unlisten(trays)
+        end)
+
+        test.it("the presence service joins aICQ's network and announces who is logged on here, by name, an e-mail id too", function()
+            fresh()
+            people.deps.send = REAL.send
+            people.deps.who = REAL.who
+            local presence = process.registry.lookup(people.PRESENCE)
+            test.not_nil(presence)
+            local scope = assert(pg.open(network.SCOPE))
+            local members = assert(scope:get_members(network.GROUP))
+            local joined = false
+            for _, pid in ipairs(members) do if tostring(pid) == tostring(presence) then joined = true end end
+            test.is_true(joined, "the service is a member of " .. network.GROUP)
+
+            -- Zed on a desktop here, as the tray sees him: an id that is an
+            -- e-mail address, as the users module mints them (the owner's
+            -- butschster@gmail.com).
+            local ZED = {user_id = "zed@example.com", full_name = "Zed Zero"}
+            local lists = assert(process.listen("desktop.list", {message = true}))
+            local rosters = assert(process.listen(network.ROSTER, {message = true}))
+            assert(scope:join(network.GROUP))
+            assert(process.registry.register(DESK))
+            process.send(presence, "aicq.presence_report", {online = 0, offline = 0})
+            local heard: any = nil
+            local deadline = time.after(tostring(network.ANNOUNCE_S + 3) .. "s")
+            while heard == nil do
+                local picked = channel.select({lists:case_receive(), rosters:case_receive(), deadline:case_receive()})
+                if picked.channel == deadline or not picked.ok then break end
+                local body: any = people.unwrap(picked.value:payload())
+                if picked.channel == lists then
+                    process.send(tostring(body.reply_to), "desktop.reply", {ok = true, command = "desktop.list",
+                        user = {id = ZED.user_id, name = ZED.full_name}})
+                elseif tostring(picked.value:from()) == tostring(presence) then
+                    for _, item in ipairs(body.p or {}) do
+                        if item.i == ZED.user_id then heard = item end
+                    end
+                end
+            end
+            test.not_nil(heard, "a roster with Zed within one announcement")
+            test.eq(heard and heard.m, "Zed Zero", "by the name his desktop gives")
+
+            -- A window is told the network too; alone, nobody is elsewhere.
+            local online, why, seen = people.deps.who()
+            test.not_nil(online, tostring(why))
+            test.eq(type(seen), "table", "the network's view comes with who is online")
+            test.eq(#seen.people, 0, "this node is never its own Network")
+            scope:leave(network.GROUP)
+            process.registry.unregister(DESK)
+            process.unlisten(lists)
+            process.unlisten(rosters)
         end)
     end)
 end

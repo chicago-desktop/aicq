@@ -157,6 +157,21 @@ local function define_tests()
             test.eq(aicq.talk_init(stand_in(), "u-anna", window()).peer.name, "u-anna", "without a name the id is the name")
         end)
 
+        test.it("a message to another computer says under it that it waits, or why it never arrived", function()
+            local rows = {
+                {from_id = "u-me", to_id = "net:node-b:u-zoe", body = "are you there?", at = "2026-09-18T10:00:00.000000000Z",
+                    pending = true},
+                {from_id = "u-me", to_id = "net:node-b:u-zoe", body = "again", at = "2026-09-18T10:01:00.000000000Z",
+                    failed = "a delivery without a recipient here"},
+                {from_id = "u-me", to_id = "net:node-b:u-zoe", body = "arrived", at = "2026-09-18T10:02:00.000000000Z"},
+            }
+            local model = aicq.talk_init(stand_in({rows = rows}), "net:node-b:u-zoe\nZoe (node-b)\n" .. LIST, window())
+            test.eq(table.concat(aicq.talk_lines(model, 60), "|"),
+                "Pavel  2026-09-18 10:00|  are you there?|  (not delivered yet: it will be when node-b is back)"
+                .. "||Pavel  2026-09-18 10:01|  again|  (not delivered: a delivery without a recipient here)"
+                .. "||Pavel  2026-09-18 10:02|  arrived")
+        end)
+
         test.it("shows the history as sender and time over the text, broken by words, own messages under own name", function()
             local model = aicq.talk_init(stand_in(), ARGS, window())
             test.eq(table.concat(aicq.talk_lines(model, 40), "|"),

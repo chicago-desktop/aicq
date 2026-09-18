@@ -545,6 +545,56 @@ local function define_tests()
             test.not_nil(row(refused, "person:u-fay"), "and stays")
         end)
 
+        test.it("Network: people on other computers, by itself, only while not empty; unknown stays; counted online", function()
+            local list = people()
+            list[#list + 1] = {id = "net:node-b:u-zoe", name = "Zoe (node-b)", online = false, desktops = 0, unread = 0,
+                listed = false, network = true, remote = true, node = "node-b", state = "unknown"}
+            list[#list + 1] = {id = "net:node-b:u-yan", name = "Yan (node-b)", online = true, desktops = 1, unread = 0,
+                listed = false, network = true, remote = true, node = "node-b", state = "online"}
+            list[#list + 1] = {id = "net:node-c:u-ida", name = "Ida (node-c)", online = false, desktops = 0, unread = 0,
+                listed = true, remote = true, node = "node-c", state = "offline"}
+            local sys = stand_in(roster(), {people = list})
+            local model = aicq.init(sys)
+            local ctx = window()
+            test.eq(labels(model),
+                "People (2/4)|  Anna (2)|  boris|  Alice|  Ida (node-c)|Network (1/2)|  Yan (node-b)|  Zoe (node-b)"
+                .. "|Agents (3/3)|  Analyst|  Scout|  Writer",
+                "the Network group after People, online first; a remote contact stays in People offline")
+            test.eq(row(model, "person:net:node-b:u-zoe").group, "network")
+            test.eq(row(model, "person:net:node-b:u-zoe").image, aicq.OFFLINE_IMAGE, "unknown: the grey flower")
+            test.eq(row(model, "person:net:node-b:u-yan").image, aicq.ONLINE_IMAGE)
+            local zoe = info_of(model, "person:net:node-b:u-zoe", ctx)
+            test.eq(zoe.lines[3], "Status: not known: node-b has not been heard from lately")
+            test.eq(zoe.lines[5], "Computer: node-b")
+            aicq.update(model, {type = "activate", id = aicq.INFO_OK}, ctx)
+
+            test.eq(status(model), "3 people online, 3 agents", "Network's online people are counted: the row agrees")
+            right_click(model, "person:net:node-b:u-yan", 4, 5, ctx)
+            test.eq(menu_ids(model), "add_person|send|info", "someone who never wrote: nothing to dismiss")
+            aicq.update(model, {type = "key", key_type = "esc"}, ctx)
+            right_click(model, "person:net:node-c:u-ida", 4, 5, ctx)
+            test.eq(menu_ids(model), "send|-|info|remove", "a remote contact is a contact")
+            aicq.update(model, {type = "key", key_type = "esc"}, ctx)
+            right_click(model, "group:network", 4, 5, ctx)
+            test.eq(menu_ids(model), "no menu", "the Network header opens no menu")
+
+            -- Enter on someone elsewhere opens their message window.
+            model.selected = "person:net:node-b:u-yan"
+            aicq.update(model, {type = "activate", id = aicq.TREE}, ctx)
+            test.eq(#sys.calls.messages, 1)
+            test.eq(sys.calls.messages[1], "net:node-b:u-yan|Yan (node-b)")
+
+            -- Add to Contacts: into People.
+            right_click(model, "person:net:node-b:u-yan", 4, 5, ctx)
+            choose(model, "add_person", ctx)
+            test.eq(table.concat(sys.calls.listed, ","), "net:node-b:u-yan")
+            test.eq(row(model, "person:net:node-b:u-yan").group, "people")
+
+            -- The last one gone: no Network group.
+            local alone = aicq.init(stand_in(roster(), {people = people()}))
+            test.is_nil(row(alone, "group:network"))
+        end)
+
         test.it("a ping from the messenger and a message window's news reload the unread counts; nothing opens on its own", function()
             local sys = stand_in(roster(), {people = people()})
             local model = aicq.init(sys)

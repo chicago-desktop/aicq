@@ -28,6 +28,7 @@ local time = require("time")
 local uuid = require("uuid")
 local registry = require("registry")
 local aicq = require("aicq")
+local network = require("network")
 
 local people = {}
 
@@ -80,6 +81,7 @@ people.unwrap = aicq.unwrap
 local CONTACTS = "chicago_aicq_contacts"
 local MESSAGES = "chicago_aicq_messages"
 local DISMISSED = "chicago_aicq_dismissed"
+local REMOTE = "chicago_aicq_remote"
 
 -- ─── helpers ────────────────────────────────────────────────────────────
 
@@ -319,7 +321,9 @@ local function who(): (any, string?)
     if not picked.ok then return nil, "the presence channel closed" end
     local body: any = people.unwrap(picked.value:payload())
     if type(body.online) ~= "table" then return nil, "the presence service answered without a list" end
-    return body.online, nil
+    -- The third value is the network (docs/aicq-network.md §3): nil while
+    -- the service is on this computer only.
+    return body.online, nil, type(body.network) == "table" and body.network or nil
 end
 
 people.deps = {security = security, directory = directory_call, send = send_to, who = who}
@@ -352,6 +356,33 @@ function people.online(): (any, string?)
     return map, err
 end
 
+-- remembered(id, name, node) — a remote person's name as heard, kept for
+-- when their node is silent. Best effort: a name not kept is heard again.
+local function remembered(id: string, name: string, node: string)
+    write("INSERT INTO " .. REMOTE .. " (id, node, name, seen_at) VALUES ($1, $2, $3, $4)"
+        .. " ON CONFLICT (id) DO UPDATE SET name = excluded.name, seen_at = excluded.seen_at",
+        {id, node, name, stamp()})
+end
+
+-- remote_item(id, seen, counts, talks) -> a remote contact's row | nil, reason:
+-- the state from the network's view (online, offline, unknown), the name as
+-- last heard.
+local function remote_item(id: any, seen: any, counts: any, talks: any): (any, string?)
+    local node, user_id = network.split(id)
+    local state, heard = network.status_in(seen, id)
+    local name: any = heard
+    if name ~= nil then
+        remembered(tostring(id), tostring(name), tostring(node))
+    else
+        local rows, err = read("SELECT name FROM " .. REMOTE .. " WHERE id = $1", {id})
+        if not rows then return nil, "the name of " .. id .. " was not read: " .. tostring(err) end
+        name = rows[1] and rows[1].name or user_id
+    end
+    return {id = id, name = network.label(name, node), uin = people.uin(id), unread = counts[id] or 0,
+        listed = true, remote = true, node = node, state = state, online = state == "online",
+        desktops = state == "online" and 1 or 0, last_at = talks[id] and talks[id].last_at or nil}, nil
+end
+
 function people.contacts(): (any, string?)
     local me, why = person()
     if not me then return nil, why end
@@ -365,29 +396,61 @@ function people.contacts(): (any, string?)
     -- The contacts, then whoever wrote to the caller and is not one, read or
     -- not — ICQ's "Not in List" — unless dismissed after their last message.
     -- Unread messages always show: the tray's envelope must point at a row.
-    local refs: any, listed: any = {}, {}
+    -- A contact on another computer (net:<node>:<id>) is not the users
+    -- directory's: its name is the one last heard (chicago_aicq_remote).
+    local refs: any, listed: any, remote: any = {}, {}, {}
     for _, row in ipairs(rows) do
         local id = tostring(row.contact_id)
         listed[id] = true
-        refs[#refs + 1] = {type = "user", id = id}
+        if network.remote(id) then remote[#remote + 1] = id else refs[#refs + 1] = {type = "user", id = id} end
     end
+    -- Whoever wrote and is not a contact — here or on another computer.
+    local wrote: any = {}
     for id, talk in pairs(talks) do
         if not listed[id] and talk.from_at ~= nil
             and ((counts[id] or 0) > 0 or talk.dismissed_at == nil or talk.from_at > talk.dismissed_at) then
-            refs[#refs + 1] = {type = "user", id = id}
+            if network.remote(id) then wrote[#wrote + 1] = id else refs[#refs + 1] = {type = "user", id = id} end
         end
     end
     local list: any = {}
-    if #refs == 0 then return list, nil end
+    local online, owhy, seen = people.deps.who()
+    if #refs == 0 and #remote == 0 and #wrote == 0 and seen == nil then return list, nil end
 
-    local denied = gate("resolve")
-    if denied then return nil, denied end
-    local answer, rerr = people.deps.directory("resolve", {refs = refs})
-    if not answer then return nil, rerr end
     local rows_by_id: any = {}
-    for _, principal in ipairs(principals_of(answer)) do rows_by_id[tostring(principal.id)] = row_of(principal) end
+    if #refs > 0 then
+        local denied = gate("resolve")
+        if denied then return nil, denied end
+        local answer, rerr = people.deps.directory("resolve", {refs = refs})
+        if not answer then return nil, rerr end
+        for _, principal in ipairs(principals_of(answer)) do rows_by_id[tostring(principal.id)] = row_of(principal) end
+    end
 
-    local online, owhy = people.online()
+    for _, id in ipairs(remote) do
+        local item, ierr = remote_item(id, seen, counts, talks)
+        if not item then return nil, ierr end
+        list[#list + 1] = item
+    end
+    -- Someone on another computer who wrote: Not in List, as anyone who
+    -- wrote, and not Network as well.
+    local shown: any = {}
+    for _, id in ipairs(wrote) do
+        local item, ierr = remote_item(id, seen, counts, talks)
+        if not item then return nil, ierr end
+        item.listed = false
+        shown[id] = true
+        list[#list + 1] = item
+    end
+    -- Network: everyone on another computer who is not a contact, while
+    -- their node is not gone (docs/aicq-network.md §3).
+    for _, person in ipairs(seen and type(seen.people) == "table" and seen.people or {}) do
+        local id = tostring(person.id)
+        if not listed[id] and not shown[id] and network.remote(id) then
+            list[#list + 1] = {id = id, name = network.label(person.name, person.node), uin = people.uin(id),
+                unread = 0, listed = false, network = true, remote = true, node = person.node,
+                state = person.state, online = person.state == "online", desktops = person.state == "online" and 1 or 0}
+        end
+    end
+
     for _, ref in ipairs(refs) do
         local item = public(rows_by_id[ref.id] or {user_id = ref.id})
         item.unread = counts[ref.id] or 0
@@ -474,9 +537,24 @@ function people.add(user_id: any): (any, string?)
     local id = trim(user_id)
     if id == "" then return nil, "no account named" end
     if id == me then return nil, "you cannot add yourself" end
-    local exists, kerr = known(id)
-    if exists == nil then return nil, kerr end
-    if not exists then return nil, "no such account: " .. id end
+    if network.remote(id) then
+        -- Someone on another computer: known here only as heard in a roster
+        -- or remembered from one.
+        local node = tostring(network.split(id))
+        local _, _, seen = people.deps.who()
+        local _, heard = network.status_in(seen, id)
+        if heard ~= nil then
+            remembered(id, tostring(heard), node)
+        else
+            local rows, rerr = read("SELECT name FROM " .. REMOTE .. " WHERE id = $1", {id})
+            if not rows then return nil, "contact not added: " .. tostring(rerr) end
+            if #rows == 0 then return nil, "nobody by that id has been heard of on " .. node end
+        end
+    else
+        local exists, kerr = known(id)
+        if exists == nil then return nil, kerr end
+        if not exists then return nil, "no such account: " .. id end
+    end
     -- A contact is not dismissed: a later Remove Contact leaves them in Not in
     -- List again, as anyone else who wrote.
     local cleared, cerr = write("DELETE FROM " .. DISMISSED .. " WHERE owner_id = $1 AND other_id = $2", {me, id})
@@ -505,9 +583,13 @@ function people.dismiss(user_id: any): (any, string?)
     local id = trim(user_id)
     if id == "" then return nil, "no account named" end
     if id == me then return nil, "you cannot dismiss yourself" end
-    local exists, kerr = known(id)
-    if exists == nil then return nil, kerr end
-    if not exists then return nil, "no such account: " .. id end
+    -- Someone on another computer is not the users directory's to know: they
+    -- are in Not in List because they wrote, and that is enough.
+    if not network.remote(id) then
+        local exists, kerr = known(id)
+        if exists == nil then return nil, kerr end
+        if not exists then return nil, "no such account: " .. id end
+    end
     local result, err = write("INSERT INTO " .. DISMISSED .. " (owner_id, other_id, dismissed_at) VALUES ($1, $2, $3)"
         .. " ON CONFLICT (owner_id, other_id) DO UPDATE SET dismissed_at = excluded.dismissed_at", {me, id, stamp()})
     if not result then return nil, "not dismissed: " .. tostring(err) end
@@ -530,9 +612,23 @@ function people.send(to_id: any, text: any): (any, string?, string?)
     if letters(body) > people.BODY_MAX then
         return nil, "the message is longer than " .. tostring(people.BODY_MAX) .. " characters", nil
     end
-    local exists, kerr = known(to)
-    if exists == nil then return nil, kerr, nil end
-    if not exists then return nil, "no such account: " .. to, nil end
+    if network.remote(to) then
+        -- Someone on another computer: known here as heard in a roster or
+        -- remembered from one. The messenger carries the row there, and
+        -- until that computer confirms it the row stays undelivered.
+        local node = tostring(network.split(to))
+        local _, _, seen = people.deps.who()
+        local _, heard = network.status_in(seen, to)
+        if heard == nil then
+            local rows, rerr = read("SELECT name FROM " .. REMOTE .. " WHERE id = $1", {to})
+            if not rows then return nil, "the message was not stored: " .. tostring(rerr), nil end
+            if #rows == 0 then return nil, "nobody by that id has been heard of on " .. node, nil end
+        end
+    else
+        local exists, kerr = known(to)
+        if exists == nil then return nil, kerr, nil end
+        if not exists then return nil, "no such account: " .. to, nil end
+    end
     local id, iderr = uuid.v7()
     if not id then return nil, "no message id: " .. tostring(iderr), nil end
     local result, err = write("INSERT INTO " .. MESSAGES .. " (id, from_id, to_id, body, created_at, read_at)"
@@ -553,15 +649,20 @@ function people.history(user_id: any, limit: any): (any, string?)
     local count = whole(limit) or people.HISTORY_DEFAULT
     if count < 1 then count = 1 end
     if count > people.HISTORY_MAX then count = people.HISTORY_MAX end
-    local rows, err = read("SELECT id, from_id, to_id, body, created_at, read_at FROM " .. MESSAGES
+    local rows, err = read("SELECT id, from_id, to_id, body, created_at, read_at, delivered_at, failed FROM " .. MESSAGES
         .. " WHERE (from_id = $1 AND to_id = $2) OR (from_id = $2 AND to_id = $1)"
         .. " ORDER BY created_at DESC, id DESC LIMIT $3", {me, peer, count})
     if not rows then return nil, "history not read: " .. tostring(err) end
     local out: any = {}
     for index = #rows, 1, -1 do
         local row: any = rows[index]
+        -- A message to another computer is pending until that computer
+        -- confirms it, unless it failed for good.
+        local away = network.remote(row.to_id)
         out[#out + 1] = {id = tostring(row.id), from_id = tostring(row.from_id), to_id = tostring(row.to_id),
-            body = tostring(row.body or ""), at = tostring(row.created_at or ""), read = row.read_at ~= nil}
+            body = tostring(row.body or ""), at = tostring(row.created_at or ""), read = row.read_at ~= nil,
+            pending = away and row.delivered_at == nil and row.failed == nil or nil,
+            failed = away and row.failed ~= nil and tostring(row.failed) or nil}
     end
     return out, nil
 end
@@ -619,6 +720,71 @@ function people.ends(message_id: any): (any, string?)
     if not row then return nil, "no message " .. message_id end
     return {id = tostring(row.id), from_id = tostring(row.from_id), to_id = tostring(row.to_id),
         body = tostring(row.body or "")}, nil
+end
+
+-- ─── for the messenger: messages between computers ─────────────────────
+
+-- outbox(limit) -> the undelivered messages to other computers, oldest
+-- first: {{id, from_id, to_id, body}} | nil, reason.
+function people.outbox(limit: any): (any, string?)
+    local count = whole(limit) or 50
+    local rows, err = read("SELECT id, from_id, to_id, body FROM " .. MESSAGES
+        .. " WHERE to_id LIKE 'net:%' AND delivered_at IS NULL AND failed IS NULL"
+        .. " ORDER BY created_at, id LIMIT $1", {count})
+    if not rows then return nil, err end
+    local out: any = {}
+    for _, row in ipairs(rows) do
+        if network.remote(row.to_id) then
+            out[#out + 1] = {id = tostring(row.id), from_id = tostring(row.from_id), to_id = tostring(row.to_id),
+                body = tostring(row.body or "")}
+        end
+    end
+    return out, nil
+end
+
+-- delivered(message_id) -> whether it was marked now (false: already, or no
+-- such message) | nil, reason.
+function people.delivered(message_id: any): (boolean?, string?)
+    if type(message_id) ~= "string" or message_id == "" then return nil, "no message id" end
+    local result, err = write("UPDATE " .. MESSAGES .. " SET delivered_at = $1 WHERE id = $2 AND delivered_at IS NULL",
+        {stamp(), message_id})
+    if not result then return nil, err end
+    return (whole(result.rows_affected) or 0) > 0, nil
+end
+
+-- failed(message_id, why) — a message the other computer refused for good:
+-- it is not offered again, and the window says why.
+function people.failed(message_id: any, why: any): (boolean?, string?)
+    if type(message_id) ~= "string" or message_id == "" then return nil, "no message id" end
+    local result, err = write("UPDATE " .. MESSAGES .. " SET failed = $1 WHERE id = $2 AND delivered_at IS NULL",
+        {string.sub(tostring(why or "refused"), 1, 200), message_id})
+    if not result then return nil, err end
+    return (whole(result.rows_affected) or 0) > 0, nil
+end
+
+-- receive(accepted) -> whether the row is new (false: a repeat of one
+-- already stored) | nil, reason. `accepted` is network.accept's answer: the
+-- sender's node is already in its from_id. Stored under the SENDER's message
+-- id, so a delivery offered again is stored once; the time is this
+-- computer's, so the history keeps the order this computer saw. The sender's
+-- name is remembered as a roster's would be.
+function people.receive(accepted: any): (boolean?, string?)
+    local result, err = write("INSERT INTO " .. MESSAGES .. " (id, from_id, to_id, body, created_at, read_at)"
+        .. " VALUES ($1, $2, $3, $4, $5, NULL) ON CONFLICT (id) DO NOTHING",
+        {accepted.id, accepted.from_id, accepted.to_id, accepted.body, stamp()})
+    if not result then return nil, "the message was not stored: " .. tostring(err) end
+    local node = network.split(accepted.from_id)
+    if node ~= nil then remembered(tostring(accepted.from_id), tostring(accepted.name), tostring(node)) end
+    return (whole(result.rows_affected) or 0) > 0, nil
+end
+
+-- remote_name(id) -> the name a person on another computer was last heard
+-- by | nil.
+function people.remote_name(id: any): string?
+    if not network.remote(id) then return nil end
+    local rows = read("SELECT name FROM " .. REMOTE .. " WHERE id = $1", {tostring(id)})
+    local first: any = rows and rows[1] or nil
+    return first and tostring(first.name) or nil
 end
 
 -- name_of(user_id) -> the name that person is shown by | nil, reason. The

@@ -131,6 +131,19 @@ entries:
   # They live here, in the harness, and not in the module's src: the module's
   # `exclude_meta: type: [test]` drops test entries from a module loaded as a
   # dependency, and the harness loads it as one.
+  - name: network_test
+    kind: function.lua
+    meta:
+      type: test
+      comment: "aICQ between computers as data — remote ids that keep an e-mail whole, nodes with a colon refused, rosters that survive the hop, each node fresh, unknown or gone, what a window is told."
+      group: aICQ
+      suite: chicago_aicq
+    source: file://network_test.lua
+    imports:
+      test: wippy.test:test
+      network: chicago.aicq:network_lib
+    method: run
+
   - name: aicq_test
     kind: function.lua
     meta:
@@ -188,12 +201,14 @@ entries:
     source: file://people_test.lua
     modules:
       - channel
+      - pg
       - process
       - sql
       - time
     imports:
       test: wippy.test:test
       people: chicago.aicq:people
+      network: chicago.aicq:network_lib
       directory: kickside.users.directory:directory_lib
       user_repo: kickside.users.persist:user_repo
       control: chicago.shell.api:control

@@ -23,6 +23,15 @@
 --
 -- The item is pushed every tick even unchanged: a restarted shell starts
 -- with an empty tray, and `ttl` removes the item if this service stops.
+--
+-- Between computers (docs/aicq-network.md §3): the service joins the pg
+-- group `aicq.presence` of aICQ's own scope and broadcasts, every
+-- ANNOUNCE_S, the people logged on here — its own rosters come back to it
+-- too. It keeps the rosters it hears by the node of the SENDING process and
+-- answers `aicq.who` with them as well (`network`), judged per node:
+-- fresh, unknown (no news, still a member) or gone (the membership says
+-- so). A scope that does not open leaves aICQ on this computer only; the
+-- tray's work goes on.
 
 local process = require("process")
 local channel = require("channel")
@@ -33,6 +42,9 @@ local roster = require("roster")
 local control = require("control")
 local aicq = require("aicq")
 local people = require("people")
+local network = require("network")
+local pg = require("pg")
+local system = require("system")
 
 local log = logger:named("chicago.aicq.presence")
 
@@ -47,8 +59,14 @@ local LIST = "desktop.list"
 --   report — the contact list's last report (aicq.heard);
 --   seen   — {[desktop name] = {user = id | false, at = seconds}};
 --   asked  — {[compositor pid] = desktop name} of this tick's questions;
---   roster — this tick's roster read, {list} or {why}.
-local state: any = {report = nil, seen = {}, asked = {}, roster = nil}
+--   roster — this tick's roster read, {list} or {why};
+--   net    — the rosters heard from the network (network.heard);
+--   scope  — the pg scope while joined, else nil;
+--   self   — this node's name; members — the nodes that count (network.members);
+--   refused — the nodes whose rosters were refused, said once each;
+--   said   — what the log last said of each node ("fresh 2", "unknown", …).
+local state: any = {report = nil, seen = {}, asked = {}, roster = nil,
+    net = {nodes = {}}, scope = nil, self = nil, members = nil, refused = {}, said = {}}
 
 local function now_s(): integer
     return math.tointeger(time.now():unix_nano() // 1000000000) or 0
@@ -149,7 +167,8 @@ local function answered(message: any)
     end
     local user: any = type(answer.user) == "table" and answer.user.id or nil
     local id = user ~= nil and tostring(user) or ""
-    state.seen[name] = {user = id ~= "" and id or false, at = now_s()}
+    local shown: any = type(answer.user) == "table" and answer.user.name or nil
+    state.seen[name] = {user = id ~= "" and id or false, name = type(shown) == "string" and shown or nil, at = now_s()}
     put(tostring(name))
 end
 
@@ -159,6 +178,98 @@ local function refresh(user_id: any)
     for name, seen in pairs(state.seen) do
         if seen.user == user_id then put(tostring(name)) end
     end
+end
+
+-- here() -> {[user_id] = name}: the people logged on to a desktop of this
+-- node, from the answers of the last two ticks.
+local function here(): any
+    local out: any = {}
+    local online = people.tally(state.seen, now_s(), aicq.REPORT_TTL_S)
+    for _, seen in pairs(state.seen) do
+        if type(seen.user) == "string" and online[seen.user] then
+            out[seen.user] = seen.name or out[seen.user] or seen.user
+        end
+    end
+    return out
+end
+
+-- join() — into the network's group; a refusal leaves aICQ on this node.
+local function join()
+    local scope, err = pg.open(network.SCOPE)
+    if not scope then
+        log:warn("aICQ stays on this computer: the network scope did not open", {error = tostring(err)})
+        return
+    end
+    local _, jerr = scope:join(network.GROUP)
+    if jerr then
+        log:warn("aICQ stays on this computer: the network group was not joined", {error = tostring(jerr)})
+        return
+    end
+    state.scope = scope
+    if not network.node_ok(state.self) then
+        log:warn("this node takes no part in aICQ between computers: its name is empty or has a colon",
+            {node = tostring(state.self)})
+    end
+end
+
+-- membership() -> the nodes that count, from the cluster and the group.
+local function membership(): any
+    local cluster = system.cluster.members()
+    local group: any = nil
+    if state.scope then group = state.scope:get_members(network.GROUP) end
+    return network.members(cluster, group)
+end
+
+-- note() — the log says when another node changes: heard (and how many
+-- people), unknown, gone. One line per change, so what a node hears is
+-- visible without asking it.
+local function note()
+    local view = network.view(state.net, state.self, now_s(), state.members)
+    local counts: any = {}
+    for _, person in ipairs(view.people) do counts[person.node] = (counts[person.node] or 0) + 1 end
+    local now_said: any = {}
+    for node, verdict in pairs(view.nodes) do
+        now_said[node] = verdict == "fresh" and ("fresh " .. tostring(counts[node] or 0)) or verdict
+    end
+    for node, text in pairs(now_said) do
+        if state.said[node] ~= text then
+            log:info("aICQ network: another computer", {node = node, state = text})
+            -- Heard again after silence or absence: the messenger offers
+            -- what waits for it now.
+            local before: any = state.said[node]
+            if view.nodes[node] == "fresh" and (before == nil or string.sub(tostring(before), 1, 5) ~= "fresh") then
+                local messenger = process.registry.lookup(aicq.MESSENGER)
+                if messenger then process.send(tostring(messenger), aicq.NODE_BACK, {node = node}) end
+            end
+        end
+    end
+    for node in pairs(state.said) do
+        if now_said[node] == nil then log:info("aICQ network: another computer", {node = node, state = "gone"}) end
+    end
+    state.said = now_said
+end
+
+-- announce() — this node's people to the group, and the membership anew.
+local function announce()
+    if not state.scope then return end
+    state.members = membership()
+    network.forget(state.net, now_s(), state.members)
+    if not network.node_ok(state.self) then return end
+    local _, err = state.scope:broadcast(network.GROUP, network.ROSTER, network.roster(here()))
+    if err then log:warn("roster not announced", {error = tostring(err)}) end
+    note()
+end
+
+-- roster(message) — a node's roster, by the node of the process that sent it.
+local function roster_heard(message: any)
+    local node = network.node_of(message:from())
+    local ok, payload = pcall(message.payload, message)
+    local taken, why = network.heard(state.net, node, ok and aicq.unwrap(payload) or nil, now_s())
+    if not taken and not state.refused[tostring(node)] then
+        state.refused[tostring(node)] = true
+        log:warn("a roster was refused", {node = tostring(node), reason = tostring(why)})
+    end
+    if taken then note() end
 end
 
 local function drop()
@@ -177,9 +288,13 @@ local function hear(message: any)
     elseif topic == people.REFRESH then
         local body: any = people.unwrap(message:payload())
         refresh(body.user_id)
+    elseif topic == network.ROSTER then
+        roster_heard(message)
     elseif topic == people.WHO then
         local online = people.tally(state.seen, now_s(), aicq.REPORT_TTL_S)
-        local sent, err = process.send(tostring(message:from()), people.ONLINE, {online = online})
+        local seen: any = nil
+        if state.scope then seen = network.view(state.net, state.self, now_s(), state.members) end
+        local sent, err = process.send(tostring(message:from()), people.ONLINE, {online = online, network = seen})
         if not sent then log:warn("presence not told", {to = tostring(message:from()), error = tostring(err)}) end
     end
 end
@@ -199,17 +314,25 @@ local function main()
         log:error("aICQ presence not registered", {name = aicq.SERVICE, error = tostring(rerr)})
         return {status = "failed", error = tostring(rerr)}
     end
+    state.self = network.node_of(process.pid())
+    join()
     push()
+    announce()
     local ticker = time.after(TICK)
+    local announcer = time.after(tostring(network.ANNOUNCE_S) .. "s")
     while true do
         local picked = channel.select({events:case_receive(), inbox:case_receive(),
-            replies:case_receive(), ticker:case_receive()})
+            replies:case_receive(), ticker:case_receive(), announcer:case_receive()})
         if not picked.ok then break end
         if picked.channel == events then
             if picked.value and picked.value.kind == process.event.CANCEL then break end
         elseif picked.channel == ticker then
             ticker = time.after(TICK)
             push()
+        elseif picked.channel == announcer then
+            announcer = time.after(tostring(network.ANNOUNCE_S) .. "s")
+            local ok, err = pcall(announce)
+            if not ok then log:error("roster not announced", {error = tostring(err)}) end
         elseif picked.channel == replies then
             local ok, err = pcall(answered, picked.value)
             if not ok then log:error("desktop answer not taken", {error = tostring(err)}) end

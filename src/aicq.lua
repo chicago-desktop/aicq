@@ -18,6 +18,7 @@
 
 local ui = require("ui")
 local editor = require("editor")
+local network = require("network")
 
 local aicq = {}
 
@@ -43,7 +44,7 @@ aicq.ADD = "add_agent"
 aicq.ADD_CONTACT = "add_contact"
 aicq.REMOVE_YES = "remove_yes"
 aicq.REMOVE_NO = "remove_no"
-aicq.GROUPS = {"people", "strangers", "agents"}
+aicq.GROUPS = {"people", "strangers", "network", "agents"}
 -- The presence service and the report to it. An open list tells the service
 -- its count of agents (the list runs under the logged-on person's actor and
 -- sees their agents too); the service believes the report while it is younger
@@ -62,6 +63,9 @@ aicq.NEW = "aicq.new"
 aicq.WATCH = "aicq.watch"
 aicq.UNWATCH = "aicq.unwatch"
 aicq.READ = "aicq.read"
+-- Presence → messenger: another computer is heard again; its undelivered
+-- messages are offered at once instead of on the next retry.
+aicq.NODE_BACK = "aicq.node_back"
 -- Between aICQ's own windows, to the contact list that opened them: a message
 -- window has shown someone's messages (they are read now), Add Contact has
 -- added someone. Not `aicq.read`: that one is the messenger's.
@@ -69,8 +73,11 @@ aicq.SEEN = "aicq.seen"
 aicq.CONTACT_ADDED = "aicq.contact_added"
 aicq.HISTORY_LIMIT = 200
 
-local TITLES: any = {people = "People", strangers = "Not in List", agents = "Agents"}
-local HEADERS: any = {people = aicq.ONLINE_IMAGE, strangers = aicq.OFFLINE_IMAGE, agents = aicq.AGENT_IMAGE}
+local TITLES: any = {people = "People", strangers = "Not in List", network = "Network", agents = "Agents"}
+local HEADERS: any = {people = aicq.ONLINE_IMAGE, strangers = aicq.OFFLINE_IMAGE, network = aicq.ONLINE_IMAGE,
+    agents = aicq.AGENT_IMAGE}
+-- The groups shown only while someone is in them.
+local SOMETIMES: any = {strangers = true, network = true}
 
 local function trim(value: any): string
     if type(value) ~= "string" then return "" end
@@ -324,14 +331,17 @@ local function by_recency(a: any, b: any): boolean
 end
 
 -- arrange(agents, people) -> {people = {entry…}, strangers = {entry…},
--- agents = {entry…}}. People and Agents online first, then by name; the
+-- network = {entry…}, agents = {entry…}}. Network is everyone on another
+-- computer who is not a contact (`network = true`, docs/aicq-network.md §3),
+-- online first, then by name; a remote person keeps `remote`, `node` and
+-- `state` ("online", "offline", "unknown"). People and Agents online first, then by name; the
 -- strangers — who wrote but are not contacts (`listed = false`, ICQ's "Not in
 -- List") — the newest conversation first. An entry is {kind = "agent" |
 -- "person", id, key, name, online}; an agent keeps its roster row in `agent`,
 -- a person their contact row in `person` and `uin`, `desktops`, `unread`,
 -- `listed` and `last_at`. A row without an id is skipped. The groups never mix.
 function aicq.arrange(agents: any, people: any): any
-    local out: any = {people = {}, strangers = {}, agents = {}}
+    local out: any = {people = {}, strangers = {}, network = {}, agents = {}}
     for _, agent in ipairs(type(agents) == "table" and agents or {}) do
         if type(agent) == "table" and agent.agent_id ~= nil and tostring(agent.agent_id) ~= "" then
             local id = tostring(agent.agent_id)
@@ -345,13 +355,15 @@ function aicq.arrange(agents: any, people: any): any
             local entry: any = {kind = "person", id = id, key = "person:" .. id,
                 name = tostring(person.name or id), online = person.online == true, uin = person.uin,
                 desktops = whole(person.desktops), unread = whole(person.unread),
-                listed = person.listed ~= false, last_at = person.last_at, person = person}
-            local side: any = entry.listed and out.people or out.strangers
+                listed = person.listed ~= false, last_at = person.last_at, person = person,
+                remote = person.remote == true, node = person.node, state = person.state}
+            local side: any = entry.listed and out.people or (person.network == true and out.network or out.strangers)
             side[#side + 1] = entry
         end
     end
     table.sort(out.people, by_presence)
     table.sort(out.strangers, by_recency)
+    table.sort(out.network, by_presence)
     table.sort(out.agents, by_presence)
     return out
 end
@@ -359,7 +371,9 @@ end
 -- summary(groups) -> "2 people online, 4 agents" — the list's bottom row, the
 -- two kinds apart as the tray's title keeps them (docs/aicq-people.md §1).
 function aicq.summary(groups: any): string
-    return headline(online_in(groups.people), online_in(groups.agents))
+    -- Network's people count as people online: the row must agree with the
+    -- groups above it.
+    return headline(online_in(groups.people) + online_in(groups.network or {}), online_in(groups.agents))
 end
 
 -- counts(groups) -> {online, offline} of the AGENTS — what an open list tells
@@ -392,16 +406,17 @@ local function member_row(entry: any, group: string): any
         image = image, person = entry.id, group = group}
 end
 
--- rows(model) -> the tree's rows: a header per group — People and Agents with
--- their online/total counter, Not in List with how many, and only while
--- someone is in it — and the members under it unless the group is collapsed.
+-- rows(model) -> the tree's rows: a header per group — People, Network and
+-- Agents with their online/total counter, Not in List with how many; Not in
+-- List and Network only while someone is in them — and the members under it
+-- unless the group is collapsed.
 -- A row carries ids, not tables: the tree goes to the compositor as frame
 -- state.
 function aicq.rows(model: any): any
     local rows: any = {}
     for _, group in ipairs(aicq.GROUPS) do
         local members: any = model.groups[group]
-        if group ~= "strangers" or #members > 0 then
+        if not SOMETIMES[group] or #members > 0 then
             local shut = collapsed(model, group)
             local counter = group == "strangers" and tostring(#members)
                 or (tostring(online_in(members)) .. "/" .. tostring(#members))
@@ -493,7 +508,7 @@ end
 --   report(counts) -> ok, why                  (the count to the presence service)
 --   watch(), unwatch() -> ok, why              (the messenger, for the list's person)
 function aicq.init(sys: any): any
-    local model: any = {sys = sys, groups = {people = {}, strangers = {}, agents = {}}, collapsed = {}, selected = nil,
+    local model: any = {sys = sys, groups = {people = {}, strangers = {}, network = {}, agents = {}}, collapsed = {}, selected = nil,
         menu = nil, sheet = nil, confirm = nil, notice = nil, failure = nil, unknown = nil, live = nil,
         truncated = false}
     aicq.load(model)
@@ -635,13 +650,15 @@ end
 -- on how many desktops, what is unread.
 function aicq.person_details(entry: any): any
     local status: string
-    if not entry.online then status = "offline"
+    if entry.state == "unknown" then status = "not known: " .. tostring(entry.node) .. " has not been heard from lately"
+    elseif not entry.online then status = "offline"
     elseif entry.desktops == 1 then status = "online, on 1 desktop"
     else status = "online, on " .. tostring(entry.desktops) .. " desktops" end
     local unread = "none"
     if entry.unread > 0 then unread = tostring(entry.unread) .. (entry.unread == 1 and " message" or " messages") end
     local lines: any = {"Name: " .. entry.name, "UIN: " .. tostring(entry.uin or "not known"), "Status: " .. status,
         "Unread: " .. unread}
+    if entry.remote then lines[#lines + 1] = "Computer: " .. tostring(entry.node) end
     if entry.listed == false then lines[#lines + 1] = "Contact: not in your list" end
     return lines
 end
@@ -714,6 +731,12 @@ end
 -- their own Add; the empty field: both. Not in List's header opens none.
 local function menu_items(model: any): any
     local entry: any = model.menu.key and entry_of(model, model.menu.key) or nil
+    -- Someone in Network: they never wrote, so there is nothing to dismiss.
+    if entry and entry.kind == "person" and entry.remote and not entry.listed
+        and type(entry.person) == "table" and entry.person.network == true then
+        return {{id = "add_person", text = "Add to Contacts", accel = 1}, {id = "send", text = "Send Message", accel = 1},
+            {id = "info", text = "Info…", accel = 1}}
+    end
     if entry and entry.kind == "person" and not entry.listed then
         return {{id = "add_person", text = "Add to Contacts", accel = 1}, {id = "send", text = "Send Message", accel = 1},
             {id = "info", text = "Info…", accel = 1}, {separator = true},
@@ -836,7 +859,7 @@ function aicq.update(model: any, action: any, context: any): boolean
             if member(row) then
                 model.selected = row.id
                 model.menu = {x = action.x, y = action.y, key = row.id}
-            elseif row and row.group == "strangers" then
+            elseif row and (row.group == "strangers" or row.group == "network") then
                 model.menu = nil
             else
                 model.menu = {x = action.x, y = action.y, group = row and row.group or nil}
@@ -996,6 +1019,15 @@ function aicq.talk_lines(model: any, width: any): any
         out[#out + 1] = who .. "  " .. stamp(message.at)
         for _, line in ipairs(ui.wrap_text(tostring(message.body or ""), room - 2)) do
             out[#out + 1] = "  " .. line
+        end
+        -- A message to another computer until that computer confirms it
+        -- (docs/aicq-network.md §5). The list has no grey for one line, so
+        -- the state is said in words under the text.
+        if message.pending or message.failed then
+            local node = tostring(network.split(message.to_id) or "the other computer")
+            local note = message.failed and ("(not delivered: " .. tostring(message.failed) .. ")")
+                or ("(not delivered yet: it will be when " .. node .. " is back)")
+            for _, line in ipairs(ui.wrap_text(note, room - 2)) do out[#out + 1] = "  " .. line end
         end
     end
     return out

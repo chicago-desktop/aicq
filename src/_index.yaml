@@ -117,6 +117,10 @@ entries:
         path: .meta.target_db
       - entry: chicago.aicq:02_dismissed
         path: .meta.target_db
+      - entry: chicago.aicq:03_network
+        path: .meta.target_db
+      - entry: chicago.aicq:04_delivery
+        path: .meta.target_db
       - entry: chicago.aicq:window_db
         path: .policy.resources +=
       - entry: chicago.aicq:presence_db
@@ -163,6 +167,7 @@ entries:
     imports:
       ui: chicago.shell.sdk:ui
       editor: chicago.shell.sdk:editor
+      network: chicago.aicq:network_lib
 
   # chicago.aicq:people
   #
@@ -184,6 +189,7 @@ entries:
       - uuid
     imports:
       aicq: chicago.aicq:aicq
+      network: chicago.aicq:network_lib
 
   # The database name lives on the migration entry; every process that uses
   # the people library reads it from there.
@@ -231,6 +237,67 @@ entries:
       migration: wippy.migration:migration
       legacy: chicago.aicq:legacy
     method: migrate
+
+  # chicago.aicq:03_network
+  - name: 03_network
+    kind: function.lua
+    meta:
+      type: migration
+      comment: "aICQ between computers — the names of people on other computers as last heard (docs/aicq-network.md §4)."
+      timestamp: "2026-09-18T18:00:00Z"
+    source: file://03_network.lua
+    imports:
+      migration: wippy.migration:migration
+    method: migrate
+
+  # chicago.aicq:04_delivery
+  - name: 04_delivery
+    kind: function.lua
+    meta:
+      type: migration
+      comment: "aICQ between computers — whether a message to another computer arrived there (delivered_at) or never will (failed), docs/aicq-network.md §5."
+      timestamp: "2026-09-18T20:00:00Z"
+    source: file://04_delivery.lua
+    imports:
+      migration: wippy.migration:migration
+    method: migrate
+
+  # ─── Between computers ────────────────────────────────────────────────
+  # chicago.aicq:network — who is where, as data (docs/aicq-network.md).
+  - name: network_lib
+    kind: library.lua
+    meta:
+      comment: "aICQ between computers as data — remote ids net:<node>:<user_id>, the rosters a node broadcasts and hears, each node judged fresh, unknown or gone."
+    source: file://network.lua
+
+  # The pg scope the presence services of all nodes meet in. The same entry
+  # id on every node is one scope: nothing is wired in the application.
+  - name: network
+    kind: pg.scope
+    meta:
+      comment: "aICQ's own process group scope — the presence services of all nodes, and the rosters they broadcast."
+    lifecycle:
+      auto_start: true
+
+  # The presence service takes part in the network: open aICQ's scope, join
+  # and read its one group, broadcast to it, and read the cluster's
+  # membership (system.read on cluster), which decides when a node is gone.
+  - name: presence_network
+    kind: security.policy
+    meta:
+      comment: "aICQ presence service between computers — open aICQ's pg scope, join, list and broadcast to the group aicq.presence, read the cluster's membership."
+    policy:
+      actions:
+        - pg.open
+        - pg.join
+        - pg.get_members
+        - pg.broadcast
+        - system.read
+      resources:
+        - chicago.aicq:network
+        - aicq.presence
+        - cluster
+      effect: allow
 
   # ─── The presence service ─────────────────────────────────────────────
   # `process.registry` is the lookup by name; taking a name is a separate
@@ -285,7 +352,9 @@ entries:
     modules:
       - channel
       - logger
+      - pg
       - process
+      - system
       - time
     imports:
       desktop: chicago.tui_desktop.desktop:window_api
@@ -293,6 +362,7 @@ entries:
       roster: kickside.agents.traits:roster_list
       aicq: chicago.aicq:aicq
       people: chicago.aicq:people
+      network: chicago.aicq:network_lib
 
   # chicago.aicq:presence.service — its host is `process_host`'s.
   - name: presence.service
@@ -313,6 +383,7 @@ entries:
           - chicago.aicq:presence_scope
           - chicago.aicq:presence_registry
           - chicago.aicq:presence_db
+          - chicago.aicq:presence_network
 
   # ─── The messenger ────────────────────────────────────────────────────
   - name: messenger_scope
@@ -421,18 +492,35 @@ entries:
   - name: messenger
     kind: process.lua
     meta:
-      comment: "aICQ messenger — pings the windows watching either end of a stored message, asks the presence service to refresh the recipient's tray and shows them a balloon tip with a flashing aICQ window; stores nothing."
+      comment: "aICQ messenger — pings the windows watching either end of a stored message, asks the presence service to refresh the recipient's tray and shows them a balloon tip with a flashing aICQ window; carries messages to other computers until they confirm, and stores the ones they deliver here."
     source: file://messenger.lua
     method: main
     modules:
       - channel
       - logger
       - process
+      - time
     imports:
       people: chicago.aicq:people
       aicq: chicago.aicq:aicq
+      network: chicago.aicq:network_lib
       notify: chicago.shell.sdk:notify
       desktop: chicago.tui_desktop.desktop:window_api
+
+  # Between computers the messenger takes a name in the cluster's EVENTUAL
+  # registry, chicago.aicq.messenger@<node>, where the other computers' messengers
+  # find it. Its own entry, not folded into messenger_scope. Writing the rows
+  # of messages from other computers needs no grant of its own: the runtime
+  # checks only db.get on a database, which messenger_db already gives.
+  - name: messenger_network
+    kind: security.policy
+    meta:
+      comment: "aICQ messenger between computers — take the name chicago.aicq.messenger@<node> in the cluster's registry."
+    policy:
+      actions:
+        - process.registry.register.eventual
+      resources: "*"
+      effect: allow
 
   # chicago.aicq:messenger.service — its host is `process_host`'s.
   - name: messenger.service
@@ -456,6 +544,7 @@ entries:
           - chicago.aicq:messenger_contract
           - chicago.aicq:messenger_binding
           - chicago.aicq:messenger_call
+          - chicago.aicq:messenger_network
           - chicago.aicq:db_name
 
   # ─── The windows ──────────────────────────────────────────────────────

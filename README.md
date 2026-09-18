@@ -12,10 +12,14 @@ aICQ for the Chicago desktop (`chicago/shell`), in the manner of ICQ:
   and **Add Agent…**;
 - the **tray item** next to the clock on every running desktop: the envelope
   `aICQ (N)` while you have unread messages, otherwise the flower with the
-  people and agents online.
+  people and agents online;
+- **between computers** of a cluster: the **Network** group with everyone
+  logged on elsewhere, shown as `<name> (<node>)`, and messages to them that
+  wait until that computer confirms them.
 
 The contract — who is who, the tables, presence, delivery — is
-[docs/aicq-people.md](docs/aicq-people.md).
+[docs/aicq-people.md](docs/aicq-people.md); between computers,
+[docs/aicq-network.md](docs/aicq-network.md).
 
 ## Parts
 
@@ -28,9 +32,11 @@ Namespace `chicago.aicq`.
 | `dialog`, `new_agent` + `agents` | The agent dialog on the stock session, and Add Agent with the libraries of the web page "Agents". |
 | `aicq` | The pure model the windows and the presence service share: groups, rows, menus, Info sheets, tray items. |
 | `people` | People's data under the caller's actor: contacts, messages, unread counts, find through the users directory behind its gate. |
-| `messenger` + `messenger.service` | Pings the windows watching either end of a stored message; stores nothing. Registered as `chicago.aicq.messenger`, actor `chicago.aicq.messenger`. |
-| `presence` + `presence.service` | Asks every desktop who is logged on and puts the item in each tray; answers `aicq.who`. Registered as `chicago.aicq.presence`, actor `chicago.aicq.presence`. |
+| `messenger` + `messenger.service` | Pings the windows watching either end of a stored message. Carries messages to other computers until they confirm, and stores the ones they deliver here. Registered as `chicago.aicq.messenger`, and as `chicago.aicq.messenger@<node>` in the cluster's registry; actor `chicago.aicq.messenger`. |
+| `presence` + `presence.service` | Asks every desktop who is logged on and puts the item in each tray; announces them to the other computers and keeps theirs; answers `aicq.who`. Registered as `chicago.aicq.presence`, actor `chicago.aicq.presence`. |
+| `network_lib`, `network` | Between computers as data (remote ids `net:<node>:<user_id>`, rosters, each node fresh, unknown or gone, deliveries), and aICQ's own pg scope the presence services meet in. |
 | `01_people`, `02_dismissed` + `legacy` | The tables `chicago_aicq_contacts`, `chicago_aicq_messages`, `chicago_aicq_dismissed`, and the one-time move of an application's `app_chat_*` rows. |
+| `03_network`, `04_delivery` | `chicago_aicq_remote` (the names of people on other computers as last heard), and `delivered_at` / `failed` on messages to other computers. |
 | `images` | The image pack under `assets/images` (32 and 16 px), called `chicago.aicq:images/<name>`; drawn by `tools/chat_icons.py`. |
 
 The tray item's key is `chicago.aicq`; an item not refreshed for 180 s is
